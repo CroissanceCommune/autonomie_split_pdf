@@ -13,7 +13,7 @@ _UNSET = object()
 
 
 class Config(object):
-    DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20}
+    DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False}
 
     def __init__(self, parsed_args):
         configstream = parsed_args.configfile
@@ -35,6 +35,13 @@ class Config(object):
          'WARNING': logging.WARNING,
          'ERROR': logging.ERROR,
          'CRITICAL': logging.CRITICAL}[str_verb]
+
+    def save_defaults(self):
+        """
+        Only called programmatically, to make the example config file
+        """
+        with open("config.yaml", "w") as confstream:
+            confstream.write(yaml.dump(self.confvalues))
 
     def getvalue(self, name, override = _UNSET):
         if override is not _UNSET:

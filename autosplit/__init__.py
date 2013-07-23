@@ -22,15 +22,17 @@ def main():
     arguments = parser.parse_args()
     config = Config(arguments)
     logging.basicConfig(level=config.getvalue('loglevel'),
-                        format="%(asctime)s [%(name)-20s] %(message)s")
+                        format="%(asctime)s [%(name)-20s][%(levelname)-8s] %(message)s")
     logger = mk_logger("autosplit.main", config)
 
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
 
+    #config.save_defaults()
+    #return
     tweaker = PdfTweaker(config)
     for pdfstream in arguments.filenames:
         #argparse has already open the files
-        logger.info('Loading PDF %s', pdfstream.name)
+        logger.info('Loading PDF "%s"', pdfstream.name)
         tweaker.tweak(pdfstream)
 
 __all__ = 'PdfTweaker', 'Config'

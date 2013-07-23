@@ -1,5 +1,6 @@
 from tempfile import mkdtemp
 from cStringIO import StringIO
+from lxml import etree
 
 from pdfminer.pdfinterp import PDFResourceManager, process_pdf
 from pdfminer.converter import TextConverter, XMLConverter
@@ -17,16 +18,34 @@ class PdfTweaker(object):
         rsrcmgr = PDFResourceManager()
         retstr = StringIO()
         laparams = LAParams()
-        device = TextConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
-#        device = XMLConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
+#        self.logger.debug("Converting to text")
+#        device = TextConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
+        self.logger.debug("Converting to xml")
+        device = XMLConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
 
-        process_pdf(rsrcmgr, device, pdfstream, maxpages=1)
+        # FIXME: remove maxpages in production
+        process_pdf(rsrcmgr, device, pdfstream, maxpages=3)
         pdfstream.close()
         device.close()
-
-        bigstring = retstr.getvalue()
+#        bigstring = retstr.getvalue()
+        retstr.seek(0)
+        tree = etree.parse(retstr)
         retstr.close()
-        print bigstring
+        for index, page in enumerate(tree.xpath('/pages/page')):
+            elt_id = 0 if index else 2  # first page has edition date and title
+            r = page.xpath('textbox[@id="%d"]/textline/text' % elt_id)
+            name = ''.join(etext.text for etext in r).strip()
+            if '\n' in name:
+                debug_fname = 'debug.xml'
+                with open(debug_fname, 'w') as debug_fd:
+                    debug_fd.write(etree.tostring(page))
+                self.logger.critical("error decoding name, page dumped to %s",
+                                    debug_fname)
+                self.logger.critical("Now halting for analysis")
+                import sys
+                sys.exit(4)
+            self.logger.info("found name: %s", name)
+#        print bigstring
         return
 
 
