@@ -1,1 +1,1 @@
-{loglevel: 20, verbosity: INFO}
+{loglevel: 20, use_syslog: false, verbosity: INFO}
