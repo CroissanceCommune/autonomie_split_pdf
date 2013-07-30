@@ -1,6 +1,6 @@
 from .config import Config, DEFAULT_CONFIGFILE
 from .log_config import mk_logger
-from .tweaker import PdfTweaker
+from .tweaker import PayrollTweaker
 
 
 def main():
@@ -10,9 +10,9 @@ def main():
     import argparse
     import logging
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('filenames', type=argparse.FileType('r'), help='pdf filename',
-                        nargs='+')
+    parser = argparse.ArgumentParser(description='Sage files parsing')
+    parser.add_argument('-p', '--payroll', type=argparse.FileType('r'),
+        help='pdf filename for pay roll', nargs='+')
     parser.add_argument('-c', '--configfile', help='configuration file, '
     'defaults to %s' % DEFAULT_CONFIGFILE,
             default=None, type=argparse.FileType('r'))
@@ -29,10 +29,12 @@ def main():
 
     #config.save_defaults()
     #return
-    tweaker = PdfTweaker(config)
-    for pdfstream in arguments.filenames:
-        #argparse has already open the files
-        logger.info('Loading PDF "%s"', pdfstream.name)
-        tweaker.tweak(pdfstream)
+    if arguments.payroll:
+        payroll_tweaker = PayrollTweaker(config)
+        print arguments.payroll
+        for pdfstream in arguments.payroll:
+            #argparse has already open the files
+            logger.info('Loading PDF "%s"', pdfstream.name)
+            payroll_tweaker.tweak(pdfstream)
 
 __all__ = 'PdfTweaker', 'Config'

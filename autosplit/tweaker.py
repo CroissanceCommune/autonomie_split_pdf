@@ -1,6 +1,7 @@
 from tempfile import mkdtemp
 from cStringIO import StringIO
 from lxml import etree
+import time
 
 from pdfminer.pdfinterp import PDFResourceManager, process_pdf
 from pdfminer.converter import TextConverter, XMLConverter
@@ -13,51 +14,33 @@ class PdfTweaker(object):
     def __init__(self, config):
         self.logger = mk_logger('autosplit.tweaker', config)
         self.config = config
+        self.rsrcmgr = PDFResourceManager()
+        self.laparams = LAParams()
 
-    def tweak(self, pdfstream):
-        rsrcmgr = PDFResourceManager()
+    def _toxml(self, pdfstream):
         retstr = StringIO()
-        laparams = LAParams()
 #        self.logger.debug("Converting to text")
 #        device = TextConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
         self.logger.debug("Converting to xml")
-        device = XMLConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
+        start_time = time.clock()
+        device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
+        laparams=self.laparams)
 
         # FIXME: remove maxpages in production
-        process_pdf(rsrcmgr, device, pdfstream, maxpages=3)
+        process_pdf(self.rsrcmgr, device, pdfstream, maxpages=3)
+        #process_pdf(self.rsrcmgr, device, pdfstream, maxpages=30)
         pdfstream.close()
         device.close()
+        duration = time.clock() - start_time
+        self.logger.debug("Conversion to xml took %s seconds.", duration)
 #        bigstring = retstr.getvalue()
         retstr.seek(0)
         tree = etree.parse(retstr)
         retstr.close()
-        for index, page in enumerate(tree.xpath('/pages/page')):
-            elt_id = 0 if index else 2  # first page has edition date and title
-            r = page.xpath('textbox[@id="%d"]/textline/text' % elt_id)
-            name = ''.join(etext.text for etext in r).strip()
-            if '\n' in name:
-                debug_fname = 'debug.xml'
-                with open(debug_fname, 'w') as debug_fd:
-                    debug_fd.write(etree.tostring(page))
-                self.logger.critical("error decoding name, page dumped to %s",
-                                    debug_fname)
-                self.logger.critical("Now halting for analysis")
-                import sys
-                sys.exit(4)
-            self.logger.info("found name: %s", name)
-#        print bigstring
-        return
+        return tree
 
-
-        pages_nb = pdf_reader.getNumPages()
-        self.logger.debug('%s has %d pages', pdfstream.name, pages_nb)
-        if pages_nb < 2:
-            self.logger.warning("Pages nb is < 2, nothing can be done")
-            return
-        tempworkdir = mkdtemp(prefix="autosplit_")
-        for tempname in self.write_pages(pdf_reader, tempworkdir):
-            good_filename = self.analyse(tempname)
-            self.storefile(tempname, good_filename)
+    def tweak(self, pdfstream):
+        raise NotImplementedError()
 
 
     def write_pages(self, pdf, workdir):
@@ -66,4 +49,38 @@ class PdfTweaker(object):
             print '[%3i]' % index, text
             writer = PdfFileWriter()
 
+class PayrollTweaker(PdfTweaker):
 
+    def search(self, page):
+        for textbox in page.xpath("textbox"):
+            bbox_value = textbox.get("bbox", None)
+            if not bbox_value.startswith("196"):
+                # I'd rather use an xpath like
+                # 'textbox[bbox="196.560,684.911,234.526,692.693"]'
+                # than this if statement, # but I can't get it to work :'(
+                continue
+            analytic_code = ''.join(etext.text
+                for etext in textbox.xpath('textline[1]/text')
+                ).strip()
+            self.logger.debug("guessing name: %s in bbox %s", analytic_code, bbox_value)
+            return analytic_code
+
+    def tweak(self, pdfstream):
+        tree = self._toxml(pdfstream)
+        for index, page in enumerate(tree.xpath('/pages/page')):
+            self.logger.debug("Page %s", index + 1)
+            analytic_code = self.search(page)
+            if analytic_code is None or not analytic_code.isalnum():
+                debug_fname = 'debug.xml'
+                self.logger.critical("invalid analytic_code read: %s",
+                analytic_code)
+                with open(debug_fname, 'w') as debug_fd:
+                    debug_fd.write(etree.tostring(page))
+                self.logger.critical("error decoding analytic code, "
+                    "page dumped to %s", debug_fname)
+                self.logger.critical("Now halting for analysis")
+                import sys
+                sys.exit(4)
+            self.logger.info("found analytic_code: %s", analytic_code)
+#        print bigstring
+        return
