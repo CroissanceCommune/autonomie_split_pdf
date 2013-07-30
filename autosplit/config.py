@@ -13,7 +13,8 @@ _UNSET = object()
 
 
 class Config(object):
-    DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False}
+    DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,
+    'restrict': 0}
 
     def __init__(self, parsed_args):
         configstream = parsed_args.configfile
@@ -22,7 +23,10 @@ class Config(object):
 
         if configstream:
             self.confvalues.update(yaml.load(configstream))
+
         self._setverb()
+
+        self.confvalues['restrict'] = self.parsed_args.restrict
 
     def _setverb(self):
         if self.parsed_args.verbose:

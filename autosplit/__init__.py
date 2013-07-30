@@ -18,6 +18,8 @@ def main():
             default=None, type=argparse.FileType('r'))
     parser.add_argument('-v', '--verbose', action='store_const', const=True,
                         help='verbose output', default=False)
+    parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
+                        type=int, default=0)
 
     arguments = parser.parse_args()
     config = Config(arguments)
@@ -26,12 +28,14 @@ def main():
     logger = mk_logger("autosplit.main", config)
 
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
+    limit = config.getvalue('restrict')
+    if limit != 0:
+        logger.info("Analysis restricted to pages <= %d", limit)
 
     #config.save_defaults()
     #return
     if arguments.payroll:
         payroll_tweaker = PayrollTweaker(config)
-        print arguments.payroll
         for pdfstream in arguments.payroll:
             #argparse has already open the files
             logger.info('Loading PDF "%s"', pdfstream.name)

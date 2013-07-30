@@ -26,9 +26,8 @@ class PdfTweaker(object):
         device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
         laparams=self.laparams)
 
-        # FIXME: remove maxpages in production
-        process_pdf(self.rsrcmgr, device, pdfstream, maxpages=3)
-        #process_pdf(self.rsrcmgr, device, pdfstream, maxpages=30)
+        process_pdf(self.rsrcmgr, device, pdfstream,
+            maxpages=self.config.getvalue('restrict'))
         pdfstream.close()
         device.close()
         duration = time.clock() - start_time
