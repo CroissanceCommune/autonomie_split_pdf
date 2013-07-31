@@ -52,26 +52,22 @@ class PdfTweaker(object):
         retstr.close()
         return tree
 
-    def splitpdfs(self, identifiers, pdfstream):
-        inputpdf = PdfFileReader(pdfstream)
-
-        for index, identifier in enumerate(identifiers):
-            output = PdfFileWriter()
-            output.addPage(inputpdf.getPage(index))
-            output_file = os.path.join(self.output_dir, identifier.getfilename())
-            self.logger.debug("Writing %s", output_file)
-            outputStream = file(output_file, "wb")
-            output.write(outputStream)
-            outputStream.close()
-            self.logger.info("Wrote %s", output_file)
-
     def tweak(self, pdfstream):
         # FIXME: possible optimization: split before parsing,
         # and parse in separate processes/threads
-        identifiers = tuple(self.get_identifiers(pdfstream))
-        pdfstream.seek(0)
         mkdir_p(self.output_dir)
-        self.splitpdfs(identifiers, pdfstream)
+
+        with open(pdfstream.name, 'r') as duplicate_pdfstream:
+            inputpdf = PdfFileReader(duplicate_pdfstream)
+            for index, identifier in enumerate(self.get_identifiers(pdfstream)):
+                output = PdfFileWriter()
+                output.addPage(inputpdf.getPage(index))
+                output_file = os.path.join(self.output_dir, identifier.getfilename())
+                self.logger.debug("Writing %s", output_file)
+                outputStream = file(output_file, "wb")
+                output.write(outputStream)
+                outputStream.close()
+                self.logger.info("Wrote %s", output_file)
 
     def sanitize_validate(self, page, value, value_name):
         """
