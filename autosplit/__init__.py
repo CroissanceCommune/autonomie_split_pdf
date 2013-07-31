@@ -1,6 +1,13 @@
+import os.path
+import re
+
 from .config import Config, DEFAULT_CONFIGFILE
 from .log_config import mk_logger
-from .tweaker import PayrollTweaker
+from .tweaker import DOC_TWEAKERS
+
+
+_FILENAMESRE = re.compile(r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
+    '[^_]+)_(?P<MONTH>[^_]+).*\.pdf')
 
 
 def main():
@@ -11,8 +18,8 @@ def main():
     import logging
 
     parser = argparse.ArgumentParser(description='Sage files parsing')
-    parser.add_argument('-p', '--payroll', type=argparse.FileType('r'),
-        help='pdf filename for pay roll', nargs='+')
+    parser.add_argument('files', type=argparse.FileType('r'),
+        help='pdf filename named DOCTYPE_YEAR_MONTH.pdf', nargs='+')
     parser.add_argument('-c', '--configfile', help='configuration file, '
     'defaults to %s' % DEFAULT_CONFIGFILE,
             default=None, type=argparse.FileType('r'))
@@ -32,13 +39,19 @@ def main():
     if limit != 0:
         logger.info("Analysis restricted to pages <= %d", limit)
 
+
     #config.save_defaults()
     #return
-    if arguments.payroll:
-        payroll_tweaker = PayrollTweaker(config)
-        for pdfstream in arguments.payroll:
-            #argparse has already open the files
-            logger.info('Loading PDF "%s"', pdfstream.name)
-            payroll_tweaker.tweak(pdfstream)
+    for openfile in arguments.files:
+        bare_filename = os.path.split(openfile.name)[-1]
+        parsed = _FILENAMESRE.match(bare_filename)
+        doctype = parsed.groups('DOCTYPE')[0]
+        year =  parsed.groups('YEAR')[0]
+        month =  parsed.groups('MONTH')[0]
+        tweaker = DOC_TWEAKERS[doctype](config, year, month)
+
+        #argparse has already open the files
+        logger.info('Loading PDF "%s"', openfile.name)
+        tweaker.tweak(openfile)
 
 __all__ = 'PdfTweaker', 'Config'

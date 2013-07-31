@@ -1,14 +1,16 @@
 from cStringIO import StringIO
 from lxml import etree
+import os.path
 import re
-from tempfile import mkdtemp
 import time
 import unicodedata
 
 from pdfminer.pdfinterp import PDFResourceManager, process_pdf
-from pdfminer.converter import TextConverter, XMLConverter
+from pdfminer.converter import XMLConverter
 from pdfminer.layout import LAParams
+from pyPdf import PdfFileWriter, PdfFileReader
 
+from .file_operations import mkdir_p
 from .log_config import mk_logger
 
 
@@ -23,16 +25,17 @@ def unix_sanitize(some_name):
 
 
 class PdfTweaker(object):
-    def __init__(self, config):
+    def __init__(self, config, year, month):
         self.logger = mk_logger('autosplit.tweaker', config)
         self.config = config
         self.rsrcmgr = PDFResourceManager()
         self.laparams = LAParams()
+        self.year = year
+        self.month = month
+        self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
 
     def _toxml(self, pdfstream):
         retstr = StringIO()
-#        self.logger.debug("Converting to text")
-#        device = TextConverter(rsrcmgr, retstr, codec='utf-8', laparams=laparams)
         self.logger.debug("Converting to xml")
         start_time = time.clock()
         device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
@@ -40,7 +43,6 @@ class PdfTweaker(object):
 
         process_pdf(self.rsrcmgr, device, pdfstream,
             maxpages=self.config.getvalue('restrict'))
-        pdfstream.close()
         device.close()
         duration = time.clock() - start_time
         self.logger.debug("Conversion to xml took %s seconds.", duration)
@@ -50,19 +52,26 @@ class PdfTweaker(object):
         retstr.close()
         return tree
 
+    def splitpdfs(self, identifiers, pdfstream):
+        inputpdf = PdfFileReader(pdfstream)
+
+        for index, identifier in enumerate(identifiers):
+            output = PdfFileWriter()
+            output.addPage(inputpdf.getPage(index))
+            output_file = os.path.join(self.output_dir, identifier.getfilename())
+            self.logger.debug("Writing %s", output_file)
+            outputStream = file(output_file, "wb")
+            output.write(outputStream)
+            outputStream.close()
+            self.logger.info("Wrote %s", output_file)
+
     def tweak(self, pdfstream):
+        # FIXME: possible optimization: split before parsing,
+        # and parse in separate processes/threads
         identifiers = tuple(self.get_identifiers(pdfstream))
-#        pdfstream.seek(0)
-
-
-
-
-
-    def write_pages(self, pdf, workdir):
-        for index, page in enumerate(pdf.pages):
-            text = page.extractText()
-            print '[%3i]' % index, text
-            writer = PdfFileWriter()
+        pdfstream.seek(0)
+        mkdir_p(self.output_dir)
+        self.splitpdfs(identifiers, pdfstream)
 
     def sanitize_validate(self, page, value, value_name):
         """
@@ -102,6 +111,7 @@ class PdfTweaker(object):
         import sys
         sys.exit(4)
 
+
 class PaySheet(object):
     def __init__(self, p_index, analytic, name, config):
         self.logger = mk_logger('autosplit.payroll', config)
@@ -111,11 +121,15 @@ class PaySheet(object):
         self.logger.info("Payroll: page %d, analytic_code: %s, for %s",
             p_index, analytic, name)
 
+    def getfilename(self):
+        return '%s_%s.pdf' % (self.analytic, self.name)
+
 
 regexpNS = "http://exslt.org/regular-expressions"
 
 
 class PayrollTweaker(PdfTweaker):
+    _DOCTYPE = 'salaires'
     _XPATH_EXPR = {
         'name': (
             'textbox[re:match(@bbox, "^[0-9]{3}.560,665.390")]/textline[1]',
@@ -141,3 +155,6 @@ class AutosplitError(Exception): pass
 
 
 class ValueNotFound(AutosplitError): pass
+
+
+DOC_TWEAKERS = {'salaires': PayrollTweaker}
