@@ -17,3 +17,14 @@ Test that the file is parseable on the 5 first pages::
 Use `-v` for debug messages.
 
 Use `-h` to get a complete overview of options.
+
+Logging
+--------
+
+That program is smart enough to use syslog if you ask for it.
+
+Example config
+--------------
+
+There is an example yaml config in the git repo. Use `./tweak -c config.yaml`, for
+instance.
