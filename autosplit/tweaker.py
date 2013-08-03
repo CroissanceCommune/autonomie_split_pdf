@@ -39,6 +39,8 @@ class PdfTweaker(object):
         for index, (name, expr) in enumerate(self._XPATH_EXPR.iteritems()):
             self.logger.debug("[%d] xpath expression for %s: %s", index, name, expr[0])
 
+        self.identifiers = {}
+
 
     def _toxml(self, pdfstream, pageno):
         human_pagenb = pageno + 1
@@ -65,8 +67,16 @@ class PdfTweaker(object):
         :note: this func could be called as a callback after get_identifier
         """
         output = PdfFileWriter()
-        output.addPage(inputpdf.getPage(identifier.get_index()))
-        output_file = os.path.join(self.output_dir, identifier.getfilename())
+        page_index = identifier.get_index()
+        ref = None
+        if identifier.append:
+            ref = self.identifiers[page_index - 1]
+            self.logger.info('Rewriting sheet %d with sheet %d',
+                identifier.p_nr, ref.p_nr)
+            output.addPage(inputpdf.getPage(ref.get_index()))
+        output.addPage(inputpdf.getPage(page_index))
+        output_file = os.path.join(self.output_dir,
+            identifier.getfilename(other=ref))
         self.logger.debug("Writing %s", output_file)
         outputStream = file(output_file, "wb")
         output.write(outputStream)
@@ -89,11 +99,14 @@ class PdfTweaker(object):
             self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
             self.logger.info("Estimated time for completion of %d pages on "
             "an average computer: %.f seconds. Please stand while the parsing"
-            " takes place.", self.pages_to_process, 2.3*self.pages_to_process)
+            " takes place.", self.pages_to_process, self._UNITARY_TIME*self.pages_to_process)
 
             start = time.clock()
             for index in xrange(self.pages_to_process):
-                identifier = self.get_identifier(pdfstream, index)
+                try:
+                    identifier = self.get_identifier(pdfstream, index)
+                except ValueNotFound, exc:
+                    self.abort(exc)
                 self.write_page(identifier, inputpdf)
             duration = time.clock() - start
             self.logger.info("Total duration: %s seconds, thank you for your patience",
@@ -111,7 +124,7 @@ class PdfTweaker(object):
             return unix_sanitize(value)
 
         self.logger.critical("invalid %s read: %s", value_name, value)
-        self.abort(page)
+        raise ValueNotFound()
 
     def search(self, page, position_name):
         xpath_expr = self._XPATH_EXPR[position_name]
@@ -125,9 +138,10 @@ class PdfTweaker(object):
             return sanitized
 
         self.logger.critical('%s NOT FOUND at position %s', position_name, xpath_expr)
-        self.abort(page)
+        raise ValueNotFound(page)
 
-    def abort(self, page):
+    def abort(self, exc):
+        page = exc.args[0]
         debug_fname = 'debug-page_%s.xml' % page.get('id', 'PAGE_ID')
         with open(debug_fname, 'w') as debug_fd:
             debug_fd.write(etree.tostring(page))
@@ -137,27 +151,55 @@ class PdfTweaker(object):
         sys.exit(4)
 
 
-class PaySheet(object):
-    def __init__(self, p_nr, analytic, name, config):
+class Sheet(object):
+    def __init__(self, p_nr, analytic, config, append=False):
+
         """
         :param int p_nr: 1 indexed page number -human numeration
         :param str analytic: analytic code
-        :param str name: firstname+lastname
         :param config: Running config
         :type config: autosplit.config.Config
         """
-        self.logger = mk_logger('autosplit.payroll', config)
+        self.usertype = self.__class__.__name__.lower()
+        self.logger = mk_logger('autosplit.%s' %
+            self.usertype, config)
         self.p_nr = p_nr
         self.analytic = analytic or 'PAS-DE-CODE-ANALYTIQUE'
-        self.name = name
-        self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
-            p_nr, name, analytic)
+        self.append = append
+
+        self.crea_info()
+
+    def crea_info(self):
+        if self.append:
+            self.logger.info("page %d will be appended to the previous one")
+            return
+        self.logger.info("page %d is a %s for analytic_code %s",
+            self.p_nr, self.usertype, self.analytic)
 
     def get_index(self):
         """
         :return: page nb, 0 indexed.
         """
         return self.p_nr - 1
+
+    def getfilename(self, other=None):
+        if other is not None:
+            return other.getfilename()
+        return '%s.pdf' % self.analytic
+
+
+class PaySheet(Sheet):
+    def __init__(self, p_nr, analytic, name, config):
+        """
+        :param str name: firstname+lastname
+        """
+        Sheet.__init__(self, p_nr, analytic, config)
+        self.name = name
+
+    def crea_info(self):
+        self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
+            self.p_nr, self.name, self.analytic)
+
 
     def getfilename(self):
         return '%s_%s.pdf' % (self.analytic, self.name)
@@ -167,6 +209,7 @@ regexpNS = "http://exslt.org/regular-expressions"
 
 
 class PayrollTweaker(PdfTweaker):
+    _UNITARY_TIME = 2.3
     _DOCTYPE = 'salaires'
     _XPATH_EXPR = {
         'name': (
@@ -190,10 +233,71 @@ class PayrollTweaker(PdfTweaker):
         return PaySheet(pageindex + 1, analytic_code, name, self.config)
 
 
+class SituationSheet(Sheet):
+    pass
+
+class SituationTweaker(PdfTweaker):
+    _UNITARY_TIME = 0.4
+    _DOCTYPE = 'situation'
+    _XPATH_EXPR = {
+        'analytic_code': (
+            'textbox[re:match(@bbox, '
+            '"^25.671,[0-9]{3}.[0-9]{3},[0-9]{2}.[0-9]{3},5[0-9]{2}.[0-9]{3}")]'
+            '/textline[1]',
+            {'namespaces': {'re': regexpNS}}
+            )
+        }
+
+    def get_identifier(self, pdfstream, pageindex):
+        pdfstream.seek(0)
+        tree = self._toxml(pdfstream, pageindex)
+        page = tree.xpath('/pages/page')[0]
+        self.logger.debug("Parsing XML for page %d", pageindex + 1)
+        append = False
+        try:
+            analytic_code = self.search(page, 'analytic_code')
+        except ValueNotFound:
+            self.logger.warning('Value of analytic code not found on page %d.'
+                'We bet it belongs to the previous page', pageindex + 1)
+            analytic_code = None
+            append = True
+        identifier = SituationSheet(pageindex + 1, analytic_code, self.config,
+            append=append)
+        self.identifiers[pageindex] = identifier
+        return identifier
+
+
+class ResultSheet(Sheet):
+    pass
+
+
+class ResultTweaker(PdfTweaker):
+    _DOCTYPE = 'result'
+    _XPATH_EXPR = {
+        'name': (
+            'textbox[re:match(@bbox, "^[0-9]{3}.560,665.390")]/textline[1]',
+            {'namespaces': {'re': regexpNS}}
+            ),
+        'analytic_code': (
+            'textbox[re:match(@bbox, '
+            '"^[0-9]{3}.560,684.911,[0-9]{3}.[0-9]{3},692.693")]/textline[1]',
+            {'namespaces': {'re': regexpNS}}
+            )
+        }
+
+    def get_identifier(self, pdfstream, pageindex):
+        pdfstream.seek(0)
+        tree = self._toxml(pdfstream, pageindex)
+        page = tree.xpath('/pages/page')[0]
+        self.logger.debug("Parsing XML for page %d", pageindex + 1)
+        analytic_code = self.search(page, 'analytic_code')
+        return ResultSheet(pageindex + 1, analytic_code, self.config)
+
 class AutosplitError(Exception): pass
 
 
 class ValueNotFound(AutosplitError): pass
 
 
-DOC_TWEAKERS = {'salaires': PayrollTweaker}
+DOC_TWEAKERS = {'salaires': PayrollTweaker, 'situation': SituationTweaker,
+    'resultat': ResultTweaker}
