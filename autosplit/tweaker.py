@@ -35,32 +35,26 @@ class PdfTweaker(object):
         self.year = year
         self.month = month
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
-        self.cached_load = False
         self.pages_to_process = self.config.getvalue('restrict')
         for index, (name, expr) in enumerate(self._XPATH_EXPR.iteritems()):
             self.logger.debug("[%d] xpath expression for %s: %s", index, name, expr[0])
 
 
-    def _toxml(self, pdfstream, pageno=0):
+    def _toxml(self, pdfstream, pageno):
+        human_pagenb = pageno + 1
         retstr = StringIO()
-        self.logger.debug("Converting to xml")
+        self.logger.debug("Converting page %d to xml", human_pagenb)
         start_time = time.clock()
         device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
         laparams=self.laparams, pageno=pageno)
 
-        if not self.cached_load:
-            self.logger.info("First pass on pdf file is longer. "
-            "Next iterations will be faster")
-            self.logger.info("Estimated time for completion on "
-            "an average computer: %.f seconds. Please stand while the parsing"
-            " takes place.", 2.3*self.pages_to_process)
 
         process_pdf(self.rsrcmgr, device, pdfstream, maxpages=1, pagenos=(pageno,))
 
         device.close()
-        self.cached_load = True
         duration = time.clock() - start_time
-        self.logger.debug("Conversion to xml took %s seconds.", duration)
+        self.logger.debug("Conversion of page %d to xml took %s seconds.",
+            human_pagenb, duration)
         retstr.seek(0)
         tree = etree.parse(retstr)
         retstr.close()
@@ -90,6 +84,10 @@ class PdfTweaker(object):
                 self.pages_to_process = pages_nb
 
             self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
+            self.logger.info("Estimated time for completion of %d pages on "
+            "an average computer: %.f seconds. Please stand while the parsing"
+            " takes place.", self.pages_to_process, 2.3*self.pages_to_process)
+
             for index in xrange(self.pages_to_process):
                 identifier = self.get_identifier(pdfstream, index)
                 self.write_page(index, identifier, inputpdf)
@@ -156,14 +154,15 @@ class PayrollTweaker(PdfTweaker):
             {'namespaces': {'re': regexpNS}}
             ),
         'analytic_code': (
-            'textbox[re:match(@bbox, "^[0-9]{3}.560,684.911,[0-9]{3}.[0-9]{3},692.693")]/textline[1]',
+            'textbox[re:match(@bbox, '
+            '"^[0-9]{3}.560,684.911,[0-9]{3}.[0-9]{3},692.693")]/textline[1]',
             {'namespaces': {'re': regexpNS}}
             )
         }
 
     def get_identifier(self, pdfstream, pageindex):
         pdfstream.seek(0)
-        tree = self._toxml(pdfstream, pageno=pageindex)
+        tree = self._toxml(pdfstream, pageindex)
         page = tree.xpath('/pages/page')[0]
         self.logger.debug("Parsing XML for page %d", pageindex + 1)
         analytic_code = self.search(page, 'analytic_code')
