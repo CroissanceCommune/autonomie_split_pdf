@@ -272,25 +272,29 @@ class ResultSheet(Sheet):
 
 
 class ResultTweaker(PdfTweaker):
+    _UNITARY_TIME = 1
     _DOCTYPE = 'result'
     _XPATH_EXPR = {
-        'name': (
-            'textbox[re:match(@bbox, "^[0-9]{3}.560,665.390")]/textline[1]',
-            {'namespaces': {'re': regexpNS}}
-            ),
         'analytic_code': (
             'textbox[re:match(@bbox, '
-            '"^[0-9]{3}.560,684.911,[0-9]{3}.[0-9]{3},692.693")]/textline[1]',
+            '"^190.431,5[0-9]{2}.[0-9]{3},2[0-9]{2}.[0-9]{3},5[0-9]{2}.[0-9]{3}")]/textline[1]',
             {'namespaces': {'re': regexpNS}}
             )
         }
 
+    I = 0
     def get_identifier(self, pdfstream, pageindex):
         pdfstream.seek(0)
         tree = self._toxml(pdfstream, pageindex)
         page = tree.xpath('/pages/page')[0]
         self.logger.debug("Parsing XML for page %d", pageindex + 1)
-        analytic_code = self.search(page, 'analytic_code')
+#        try:
+#            analytic_code = self.search(page, 'analytic_code')
+#        except:
+#            if ResultTweaker.I > 0:
+#                raise
+#            ResultTweaker.I += 1
+#            analytic_code = "dummy"
         return ResultSheet(pageindex + 1, analytic_code, self.config)
 
 class AutosplitError(Exception): pass
