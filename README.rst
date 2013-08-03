@@ -1,0 +1,19 @@
+User constraint
+---------------
+
+Use with files named .../path/.../[salaires|tresorerie]_YYYY_MM.pdf
+
+Examples
+--------
+
+A full run::
+
+    ./tweak.py playground/salaires_2013_07.pdf -r 5
+
+Test that the file is parseable on the 5 first pages::
+
+    ./tweak.py playground/salaires_2013_07.pdf -r 5
+
+Use `-v` for debug messages.
+
+Use `-h` to get a complete overview of options.
