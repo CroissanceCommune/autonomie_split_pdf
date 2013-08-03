@@ -1,3 +1,8 @@
+local installation
+------------------
+
+pip install -r requirements.txt
+
 User constraint
 ---------------
 
