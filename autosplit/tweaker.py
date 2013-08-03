@@ -60,9 +60,12 @@ class PdfTweaker(object):
         retstr.close()
         return tree
 
-    def write_page(self, index, identifier, inputpdf):
+    def write_page(self, identifier, inputpdf):
+        """
+        :note: this func could be called as a callback after get_identifier
+        """
         output = PdfFileWriter()
-        output.addPage(inputpdf.getPage(index))
+        output.addPage(inputpdf.getPage(identifier.get_index()))
         output_file = os.path.join(self.output_dir, identifier.getfilename())
         self.logger.debug("Writing %s", output_file)
         outputStream = file(output_file, "wb")
@@ -88,9 +91,13 @@ class PdfTweaker(object):
             "an average computer: %.f seconds. Please stand while the parsing"
             " takes place.", self.pages_to_process, 2.3*self.pages_to_process)
 
+            start = time.clock()
             for index in xrange(self.pages_to_process):
                 identifier = self.get_identifier(pdfstream, index)
-                self.write_page(index, identifier, inputpdf)
+                self.write_page(identifier, inputpdf)
+            duration = time.clock() - start
+            self.logger.info("Total duration: %s seconds, thank you for your patience",
+                duration)
 
     def sanitize_validate(self, page, value, value_name):
         """
@@ -131,13 +138,26 @@ class PdfTweaker(object):
 
 
 class PaySheet(object):
-    def __init__(self, p_index, analytic, name, config):
+    def __init__(self, p_nr, analytic, name, config):
+        """
+        :param int p_nr: 1 indexed page number -human numeration
+        :param str analytic: analytic code
+        :param str name: firstname+lastname
+        :param config: Running config
+        :type config: autosplit.config.Config
+        """
         self.logger = mk_logger('autosplit.payroll', config)
-        self.p_index = p_index
+        self.p_nr = p_nr
         self.analytic = analytic or 'PAS-DE-CODE-ANALYTIQUE'
         self.name = name
         self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
-            p_index, name, analytic)
+            p_nr, name, analytic)
+
+    def get_index(self):
+        """
+        :return: page nb, 0 indexed.
+        """
+        return self.p_nr - 1
 
     def getfilename(self):
         return '%s_%s.pdf' % (self.analytic, self.name)
