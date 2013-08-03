@@ -25,6 +25,8 @@ def unix_sanitize(some_name):
 
 
 class PdfTweaker(object):
+
+    _XPATH_EXPR = {}
     def __init__(self, config, year, month):
         self.logger = mk_logger('autosplit.tweaker', config)
         self.config = config
@@ -33,41 +35,64 @@ class PdfTweaker(object):
         self.year = year
         self.month = month
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
+        self.cached_load = False
+        self.pages_to_process = self.config.getvalue('restrict')
+        for index, (name, expr) in enumerate(self._XPATH_EXPR.iteritems()):
+            self.logger.debug("[%d] xpath expression for %s: %s", index, name, expr[0])
 
-    def _toxml(self, pdfstream):
+
+    def _toxml(self, pdfstream, pageno=0):
         retstr = StringIO()
         self.logger.debug("Converting to xml")
         start_time = time.clock()
         device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
-        laparams=self.laparams)
+        laparams=self.laparams, pageno=pageno)
 
-        process_pdf(self.rsrcmgr, device, pdfstream,
-            maxpages=self.config.getvalue('restrict'))
+        if not self.cached_load:
+            self.logger.info("First pass on pdf file is longer. "
+            "Next iterations will be faster")
+            self.logger.info("Estimated time for completion on "
+            "an average computer: %.f seconds. Please stand while the parsing"
+            " takes place.", 2.3*self.pages_to_process)
+
+        process_pdf(self.rsrcmgr, device, pdfstream, maxpages=1, pagenos=(pageno,))
+
         device.close()
+        self.cached_load = True
         duration = time.clock() - start_time
         self.logger.debug("Conversion to xml took %s seconds.", duration)
-#        bigstring = retstr.getvalue()
         retstr.seek(0)
         tree = etree.parse(retstr)
         retstr.close()
         return tree
 
+    def write_page(self, index, identifier, inputpdf):
+        output = PdfFileWriter()
+        output.addPage(inputpdf.getPage(index))
+        output_file = os.path.join(self.output_dir, identifier.getfilename())
+        self.logger.debug("Writing %s", output_file)
+        outputStream = file(output_file, "wb")
+        output.write(outputStream)
+        outputStream.close()
+        self.logger.info("Wrote %s", output_file)
+
     def tweak(self, pdfstream):
-        # FIXME: possible optimization: split before parsing,
-        # and parse in separate processes/threads
+        # XXX optim: parse in separate processes/threads
+
         mkdir_p(self.output_dir)
 
         with open(pdfstream.name, 'r') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
-            for index, identifier in enumerate(self.get_identifiers(pdfstream)):
-                output = PdfFileWriter()
-                output.addPage(inputpdf.getPage(index))
-                output_file = os.path.join(self.output_dir, identifier.getfilename())
-                self.logger.debug("Writing %s", output_file)
-                outputStream = file(output_file, "wb")
-                output.write(outputStream)
-                outputStream.close()
-                self.logger.info("Wrote %s", output_file)
+
+            pages_nb = inputpdf.getNumPages()
+            if not self.pages_to_process:
+                # 0 means no restriction
+                self.pages_to_process = pages_nb
+
+            self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
+            for index in xrange(self.pages_to_process):
+                identifier = self.get_identifier(pdfstream, index)
+                self.write_page(index, identifier, inputpdf)
 
     def sanitize_validate(self, page, value, value_name):
         """
@@ -85,7 +110,6 @@ class PdfTweaker(object):
 
     def search(self, page, position_name):
         xpath_expr = self._XPATH_EXPR[position_name]
-        self.logger.debug("xpath expression: %s", xpath_expr[0])
         for textbox in page.xpath(xpath_expr[0], **xpath_expr[1]):
             # sometimes, the first textbox is empty, we iterate.
             value = ''.join(etext.text
@@ -112,10 +136,10 @@ class PaySheet(object):
     def __init__(self, p_index, analytic, name, config):
         self.logger = mk_logger('autosplit.payroll', config)
         self.p_index = p_index
-        self.analytic = analytic
+        self.analytic = analytic or 'PAS-DE-CODE-ANALYTIQUE'
         self.name = name
-        self.logger.info("Payroll: page %d, analytic_code: %s, for %s",
-            p_index, analytic, name)
+        self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
+            p_index, name, analytic)
 
     def getfilename(self):
         return '%s_%s.pdf' % (self.analytic, self.name)
@@ -137,14 +161,14 @@ class PayrollTweaker(PdfTweaker):
             )
         }
 
-    def get_identifiers(self, pdfstream):
+    def get_identifier(self, pdfstream, pageindex):
         pdfstream.seek(0)
-        tree = self._toxml(pdfstream)
-        for index, page in enumerate(tree.xpath('/pages/page')):
-            self.logger.info("Page %s", index + 1)
-            analytic_code = self.search(page, 'analytic_code')
-            name = self.search(page, 'name')
-            yield PaySheet(index + 1, analytic_code, name, self.config)
+        tree = self._toxml(pdfstream, pageno=pageindex)
+        page = tree.xpath('/pages/page')[0]
+        self.logger.debug("Parsing XML for page %d", pageindex + 1)
+        analytic_code = self.search(page, 'analytic_code')
+        name = self.search(page, 'name')
+        return PaySheet(pageindex + 1, analytic_code, name, self.config)
 
 
 class AutosplitError(Exception): pass
