@@ -33,3 +33,9 @@ Example config
 
 There is an example yaml config in the git repo. Use `./tweak -c config.yaml`, for
 instance.
+
+How to debug
+--------------
+
+When the expected data is not found, tweak dumps the current XML page in a file
+so you can read it. A good (quite sufficient) XML reader is iceweasel.
