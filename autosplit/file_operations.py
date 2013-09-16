@@ -11,5 +11,7 @@ def mkdir_p(path, logger):
         if exc.errno == errno.EEXIST and os.path.isdir(path):
             pass
         else:
-            logger.critical("Error while creating directory %s -see trace" % path)
+            fullpath = os.path.join(os.getcwd(), path)
+            logger.critical("Error while creating directory %s -see trace" %
+                fullpath)
             raise
