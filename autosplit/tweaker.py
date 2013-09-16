@@ -182,10 +182,13 @@ class Sheet(object):
         """
         return self.p_nr - 1
 
+    def _getfilename(self):
+        return '%s.pdf' % self.analytic
+
     def getfilename(self, other=None):
         if other is not None:
             return other.getfilename()
-        return '%s.pdf' % self.analytic
+        return self._getfilename()
 
 
 class PaySheet(Sheet):
@@ -193,15 +196,15 @@ class PaySheet(Sheet):
         """
         :param str name: firstname+lastname
         """
-        Sheet.__init__(self, p_nr, analytic, config)
         self.name = name
+        Sheet.__init__(self, p_nr, analytic, config)
 
     def crea_info(self):
         self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
             self.p_nr, self.name, self.analytic)
 
 
-    def getfilename(self):
+    def _getfilename(self):
         return '%s_%s.pdf' % (self.analytic, self.name)
 
 
