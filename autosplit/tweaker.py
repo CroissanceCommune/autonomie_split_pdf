@@ -86,7 +86,7 @@ class PdfTweaker(object):
     def tweak(self, pdfstream):
         # XXX optim: parse in separate processes/threads
 
-        mkdir_p(self.output_dir)
+        mkdir_p(self.output_dir, self.logger)
 
         with open(pdfstream.name, 'r') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
