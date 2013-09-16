@@ -1,6 +1,7 @@
 import os, errno
 
-def mkdir_p(path):
+
+def mkdir_p(path, logger):
     """
     http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
     """
@@ -10,4 +11,5 @@ def mkdir_p(path):
         if exc.errno == errno.EEXIST and os.path.isdir(path):
             pass
         else:
+            logger.critical("Error while creating directory %s -see trace" % path)
             raise
