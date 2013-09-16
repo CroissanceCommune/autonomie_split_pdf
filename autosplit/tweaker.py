@@ -291,13 +291,13 @@ class ResultTweaker(PdfTweaker):
         tree = self._toxml(pdfstream, pageindex)
         page = tree.xpath('/pages/page')[0]
         self.logger.debug("Parsing XML for page %d", pageindex + 1)
-#        try:
-#            analytic_code = self.search(page, 'analytic_code')
-#        except:
-#            if ResultTweaker.I > 0:
-#                raise
-#            ResultTweaker.I += 1
-#            analytic_code = "dummy"
+        try:
+            analytic_code = self.search(page, 'analytic_code')
+        except:
+            if ResultTweaker.I > 0:
+                raise
+            ResultTweaker.I += 1
+            analytic_code = None
         return ResultSheet(pageindex + 1, analytic_code, self.config)
 
 class AutosplitError(Exception): pass
