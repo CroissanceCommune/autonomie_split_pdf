@@ -213,7 +213,7 @@ regexpNS = "http://exslt.org/regular-expressions"
 
 class PayrollTweaker(PdfTweaker):
     _UNITARY_TIME = 2.3
-    _DOCTYPE = 'salaires'
+    _DOCTYPE = 'salaire'
     _XPATH_EXPR = {
         'name': (
             'textbox[re:match(@bbox, "^[0-9]{3}.560,665.390")]/textline[1]',
@@ -241,7 +241,7 @@ class SituationSheet(Sheet):
 
 class SituationTweaker(PdfTweaker):
     _UNITARY_TIME = 0.4
-    _DOCTYPE = 'situation'
+    _DOCTYPE = 'tresorerie'
     _XPATH_EXPR = {
         'analytic_code': (
             'textbox[re:match(@bbox, '
@@ -276,7 +276,7 @@ class ResultSheet(Sheet):
 
 class ResultTweaker(PdfTweaker):
     _UNITARY_TIME = 1
-    _DOCTYPE = 'result'
+    _DOCTYPE = 'resultat'
     _XPATH_EXPR = {
         'analytic_code': (
             'textbox[re:match(@bbox, '
@@ -306,5 +306,5 @@ class AutosplitError(Exception): pass
 class ValueNotFound(AutosplitError): pass
 
 
-DOC_TWEAKERS = {'salaires': PayrollTweaker, 'situation': SituationTweaker,
+DOC_TWEAKERS = {'salaire': PayrollTweaker, 'tresorerie': SituationTweaker,
     'resultat': ResultTweaker}
