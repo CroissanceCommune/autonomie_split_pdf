@@ -1,16 +1,10 @@
-from cStringIO import StringIO
 from lxml import etree
 import os.path
 import re
 import time
 import unicodedata
-from collections import Iterable, defaultdict
+from collections import Iterable
 
-from pdfminer.pdftypes import resolve1
-from pdfminer.pdfparser import PDFParser, PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, process_pdf
-from pdfminer.converter import XMLConverter
-from pdfminer.layout import LAParams
 from PyPDF2 import PdfFileWriter, PdfFileReader
 from PyPDF2.pdf import Destination
 
@@ -34,8 +28,6 @@ class PdfTweaker(object):
     def __init__(self, config, year, month):
         self.logger = mk_logger('autosplit.tweaker', config)
         self.config = config
-        self.rsrcmgr = PDFResourceManager()
-        self.laparams = LAParams()
         self.year = year
         self.month = month
         self.last_print_page = 0
@@ -45,48 +37,6 @@ class PdfTweaker(object):
             self.logger.debug("[%d] xpath expression for %s: %s", index, name, expr[0])
 
         self.identifiers = {}
-
-
-    def _toxml(self, pdfstream, pageno):
-        human_pagenb = pageno + 1
-        retstr = StringIO()
-        self.logger.debug("Converting page %d to xml", human_pagenb)
-        start_time = time.clock()
-        device = XMLConverter(self.rsrcmgr, retstr, codec='utf-8',
-        laparams=self.laparams, pageno=pageno)
-
-
-        process_pdf(self.rsrcmgr, device, pdfstream, maxpages=1, pagenos=(pageno,))
-
-        device.close()
-        duration = time.clock() - start_time
-        self.logger.debug("Conversion of page %d to xml took %s seconds.",
-            human_pagenb, duration)
-        retstr.seek(0)
-        tree = etree.parse(retstr)
-        retstr.close()
-        return tree
-
-    def write_page(self, identifier, inputpdf):
-        """
-        :note: this func could be called as a callback after get_identifier
-        """
-        output = PdfFileWriter()
-        page_index = identifier.get_index()
-        ref = None
-        if identifier.append:
-            ref = self.identifiers[page_index - 1]
-            self.logger.info('Rewriting sheet %d with sheet %d',
-                identifier.p_nr, ref.p_nr)
-            output.addPage(inputpdf.getPage(ref.get_index()))
-        output.addPage(inputpdf.getPage(page_index))
-        output_file = os.path.join(self.output_dir,
-            identifier.getfilename(other=ref))
-        self.logger.debug("Writing %s", output_file)
-        outputStream = file(output_file, "wb")
-        output.write(outputStream)
-        outputStream.close()
-        self.logger.info("Wrote %s", output_file)
 
     def tweak(self, pdfstream):
         mkdir_p(self.output_dir, self.logger)
@@ -124,33 +74,44 @@ class PdfTweaker(object):
         cur_index = 0
         next_index = 1
         while self.last_print_page < pages_nb:
+            print_all_remaining = False
             cur_entr, cur_ancode = self.alldata[cur_index]
-            next_entr, next_ancode = self.alldata[next_index]
+            if next_index < len(self.alldata):
+                next_entr, next_ancode = self.alldata[next_index]
+                # may be None here also:
+                next_startpage = self.findpage(next_ancode)
+            else:
+                next_startpage = None
             outfname = '%s_%s.pdf' % (cur_entr, cur_ancode)
             outfname = "%s/%s" % (self.output_dir, outfname.replace('/', '_'))
 
-            next_startpage = self.findpage(next_ancode)
             if next_startpage is None:
-                # let's print all remaining pages together and stop the
-                # program.
-                pass
-            else:
-                output = PdfFileWriter()
-                nb_print_pages = 1
-                if self.last_print_page == next_startpage:
-                    self.logger.warning("2 analytic codes on page %d",
-                        self.last_print_page)
-                    output.addPage(self.allpages[self.last_print_page])
-                else:
-                    nb_print_pages = next_startpage - self.last_print_page
-                    for page in self.allpages[self.last_print_page:next_startpage]:
-                        output.addPage(page)
-                        self.last_print_page += 1
-                with open(outfname, 'w') as wfd:
-                    self.logger.info("|| | %d page(s) -> %s", nb_print_pages, outfname)
-                    output.write(wfd)
+                print_all_remaining = True
+            self.printpages(print_all_remaining, outfname, next_startpage)
             cur_index = next_index
             next_index += 1
+
+    def printpages(self, print_all_remaining, outfname, next_startpage):
+        output = PdfFileWriter()
+        nb_print_pages = 1
+        if print_all_remaining:
+            for page in self.allpages[self.last_print_page:]:
+                output.addPage(page)
+                nb_print_pages += 1
+                self.last_print_page += 1
+        else:
+            if self.last_print_page == next_startpage:
+                self.logger.warning("2 analytic codes on page %d",
+                    self.last_print_page)
+                output.addPage(self.allpages[self.last_print_page])
+            else:
+                nb_print_pages = next_startpage - self.last_print_page
+                for page in self.allpages[self.last_print_page:next_startpage]:
+                    output.addPage(page)
+                    self.last_print_page += 1
+        with open(outfname, 'w') as wfd:
+            self.logger.info("|| | %d page(s) -> %s", nb_print_pages, outfname)
+            output.write(wfd)
 
 
     def findpage(self, ancode):
@@ -195,35 +156,6 @@ class PdfTweaker(object):
                 else:
                     self.logger.warning("Skipping entry of type %s" %
                         type(destination))
-
-    def _tweak(self, pdfstream):
-        # XXX optim: parse in separate processes/threads
-
-        mkdir_p(self.output_dir, self.logger)
-
-        with open(pdfstream.name, 'r') as duplicate_pdfstream:
-            inputpdf = PdfFileReader(duplicate_pdfstream)
-
-            pages_nb = inputpdf.getNumPages()
-            if not self.pages_to_process:
-                # 0 means no restriction
-                self.pages_to_process = pages_nb
-
-            self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
-            self.logger.info("Estimated time for completion of %d pages on "
-            "an average computer: %.f seconds. Please stand while the parsing"
-            " takes place.", self.pages_to_process, self._UNITARY_TIME*self.pages_to_process)
-
-            start = time.clock()
-            for index in xrange(self.pages_to_process):
-                try:
-                    identifier = self.get_identifier(pdfstream, index)
-                except ValueNotFound, exc:
-                    self.abort(exc)
-                self.write_page(identifier, inputpdf)
-            duration = time.clock() - start
-            self.logger.info("Total duration: %s seconds, thank you for your patience",
-                duration)
 
     def sanitize_validate(self, page, value, value_name):
         """
@@ -325,7 +257,7 @@ regexpNS = "http://exslt.org/regular-expressions"
 
 
 class PayrollTweaker(PdfTweaker):
-    _UNITARY_TIME = 2.3
+    _UNITARY_TIME = 0.1
     _DOCTYPE = 'salaire'
     _XPATH_EXPR = {
         'name': (
