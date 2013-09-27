@@ -29,8 +29,8 @@ class PayrollTweaker(PdfTweaker):
                 output.write(wfd)
 
     def getinfo(self, filename, pagenb):
-        command = [self.preprocessor, filename, pagenb]
-        process = Popen(command.split(), stdout=PIPE, stderr=PIPE)
+        command = [self.preprocessor, filename, '%d' % pagenb]
+        process = Popen(command, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
             raise ParseError("Return code of command: %d", process.returncode)

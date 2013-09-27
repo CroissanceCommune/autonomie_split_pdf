@@ -14,7 +14,7 @@ _UNSET = object()
 
 class Config(object):
     DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,
-    'restrict': 0}
+    'restrict': 0, 'payroll_preprocessor': './payrollpdf2ancode.sh'}
 
     def __init__(self, parsed_args):
         configstream = parsed_args.configfile
