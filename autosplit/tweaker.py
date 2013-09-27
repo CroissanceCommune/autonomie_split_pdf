@@ -23,7 +23,6 @@ def unix_sanitize(some_name):
 
 class PdfTweaker(object):
 
-    _XPATH_EXPR = {}
     def __init__(self, config, year, month):
         self.logger = mk_logger('autosplit.tweaker', config)
         self.config = config
@@ -32,8 +31,6 @@ class PdfTweaker(object):
         self.last_print_page = 0
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
         self.pages_to_process = self.config.getvalue('restrict')
-        for index, (name, expr) in enumerate(self._XPATH_EXPR.iteritems()):
-            self.logger.debug("[%d] xpath expression for %s: %s", index, name, expr[0])
 
         self.identifiers = {}
 
@@ -88,6 +85,7 @@ class PdfTweaker(object):
             else:
                 next_startpage = None
             outfname = '%s_%s.pdf' % (cur_ancode, cur_entr)
+            outfname = outfname.encode('ascii', 'replace')
             outfname = "%s/%s" % (self.output_dir, unix_sanitize(outfname))
 
             if next_startpage is None:
