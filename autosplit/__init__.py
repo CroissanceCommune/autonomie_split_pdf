@@ -52,6 +52,11 @@ def main():
 
         #argparse has already open the files
         logger.info('Loading PDF "%s"', openfile.name)
-        tweaker.tweak(openfile)
+        try:
+            tweaker.tweak(openfile)
+        except:
+            logging.exception("Exception not handled by the splitter, that's a"
+            "bug, sorry")
+            raise
 
 __all__ = 'PdfTweaker', 'Config'
