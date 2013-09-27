@@ -85,8 +85,7 @@ class PdfTweaker(object):
             else:
                 next_startpage = None
             outfname = '%s_%s.pdf' % (cur_ancode, cur_entr)
-            outfname = outfname.encode('ascii', 'replace')
-            outfname = "%s/%s" % (self.output_dir, unix_sanitize(outfname))
+            outfname = unix_sanitize("%s/%s" % (self.output_dir, outfname))
 
             if next_startpage is None:
                 print_all_remaining = True
