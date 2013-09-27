@@ -67,8 +67,14 @@ class PdfTweaker(object):
             current_page = reader.getPage(index)
             self.allpages.append(current_page)
         self.alldata = []
+
+        self.logger.info("Parsing outlines. Output below")
         for entrepreneur, ancode in self.browse(outlines):
             self.alldata.append((entrepreneur, ancode))
+
+        if not self.alldata:
+            self.logger.critical("could not parse outlines?!")
+            return
 
         cur_index = 0
         next_index = 1
