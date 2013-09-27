@@ -105,67 +105,53 @@ class PdfTweaker(object):
 
             start = time.clock()
 
-            with open(pdfstream.name, 'rb') as duplicate_pdfstream:
-                reader = PdfFileReader(duplicate_pdfstream)
-                outlines = reader.getOutlines()
-                self.allpages = []
-                for index in xrange(pages_nb):
-                    current_page = reader.getPage(index)
-                    self.allpages.append(current_page)
-                self.alldata = []
-                for entrepreneur, ancode in self.browse(outlines):
-                    self.alldata.append((entrepreneur, ancode))
-
-                cur_entr, cur_ancode = self.alldata[0]
-                next_entr, next_ancode = self.alldata[1]
-                outfname = '%s_%s.pdf' % (cur_entr, cur_ancode)
-                outfname = "%s/%s" % (self.output_dir, outfname.replace('/', '_'))
-
-                next_startpage = self.findpage(next_ancode)
-                if next_startpage is None:
-                    # let's print all remaining pages together and stop the
-                    # program.
-                    pass
-                else:
-                    output = PdfFileWriter()
-                    if self.last_print_page == next_startpage:
-                        self.logger.warning("2 analytic codes on page %d",
-                            self.last_print_page)
-                        output.addPage(self.allpages[self.last_print_page])
-                    else:
-                        for page in self.allpages[self.last_print_page:next_startpage]:
-                            output.addPage(page)
-                            self.last_print_page += 1
-                    with open(outfname, 'w') as wfd:
-                        self.logger.info("|| |-> %s", outfname)
-                        output.write(wfd)
-
-
-
-
-
-
-                if False:
-                    output = PdfFileWriter()
-                    target_page = destination.page.getObject()
-                    output.addPage(target_page)
-                    startoffset = self.findpage(ancode)
-                    print "startoffset", startoffset
-                    outfname = '%s_%s.pdf' % (entrepreneur, ancode)
-                    outfname = "playground/%s" % outfname.replace('/', '_')
-                    with open(outfname, 'w') as wfd:
-                        self.logger.info("|| |-> %s", outfname)
-                        output.write(wfd)
-    #                    destination.page.getObject().writeToStream(wfd, '')
-
+            self.split_stream(inputpdf, pages_nb)
 
             duration = time.clock() - start
             self.logger.info("Total duration: %s seconds, thank you for your patience",
                 duration)
 
-    def printpage(self):
-        pass
-        self.last_print_page += 1
+    def split_stream(self, reader, pages_nb):
+        outlines = reader.getOutlines()
+        self.allpages = []
+        for index in xrange(pages_nb):
+            current_page = reader.getPage(index)
+            self.allpages.append(current_page)
+        self.alldata = []
+        for entrepreneur, ancode in self.browse(outlines):
+            self.alldata.append((entrepreneur, ancode))
+
+        cur_index = 0
+        next_index = 1
+        while self.last_print_page < pages_nb:
+            cur_entr, cur_ancode = self.alldata[cur_index]
+            next_entr, next_ancode = self.alldata[next_index]
+            outfname = '%s_%s.pdf' % (cur_entr, cur_ancode)
+            outfname = "%s/%s" % (self.output_dir, outfname.replace('/', '_'))
+
+            next_startpage = self.findpage(next_ancode)
+            if next_startpage is None:
+                # let's print all remaining pages together and stop the
+                # program.
+                pass
+            else:
+                output = PdfFileWriter()
+                nb_print_pages = 1
+                if self.last_print_page == next_startpage:
+                    self.logger.warning("2 analytic codes on page %d",
+                        self.last_print_page)
+                    output.addPage(self.allpages[self.last_print_page])
+                else:
+                    nb_print_pages = next_startpage - self.last_print_page
+                    for page in self.allpages[self.last_print_page:next_startpage]:
+                        output.addPage(page)
+                        self.last_print_page += 1
+                with open(outfname, 'w') as wfd:
+                    self.logger.info("|| | %d page(s) -> %s", nb_print_pages, outfname)
+                    output.write(wfd)
+            cur_index = next_index
+            next_index += 1
+
 
     def findpage(self, ancode):
         for index, page in enumerate(self.allpages[self.last_print_page:]):
