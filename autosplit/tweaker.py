@@ -1,63 +1,59 @@
-import os.path
-import re
-import time
-import unicodedata
 from collections import Iterable
+import re
+from subprocess import Popen, PIPE
 
-from PyPDF2 import PdfFileWriter, PdfFileReader
+from PyPDF2 import PdfFileWriter
 from PyPDF2.pdf import Destination
 
-from .file_operations import mkdir_p
-from .log_config import mk_logger
+from .tweaker_base import PdfTweaker, unix_sanitize
 
 
-_UNIX_VALID = re.compile('[^\w\s-]')
-_NOSPACES = re.compile('[-\s]+')
+class ParseError(Exception):
+    pass
 
 
-def unix_sanitize(some_name):
-    value = unicodedata.normalize('NFKD', some_name).encode('ascii', 'ignore')
-    value = unicode(_UNIX_VALID.sub('', value).strip())
-    return _NOSPACES.sub('-', value)
+class PayrollTweaker(PdfTweaker):
+    _DOCTYPE = 'salaire'
+    _UNITARY_TIME = 0.1
+    _ANCODE_MARKER = re.compile('^ANCODE ')
+    _NAME_MARKER = re.compile('^NAME ')
+
+    def split_stream(self, filename, reader, pages_nb):
+        for pagenb in xrange(pages_nb):
+            output = PdfFileWriter()
+            ancode, name = self.getinfo(filename, pagenb)
+            outfname = self.get_outfname(ancode, name)
+            with open(outfname, 'w') as wfd:
+                self.logger.info("%s - %s -> %s", ancode, name, outfname)
+                output.write(wfd)
+
+    def getinfo(self, filename, pagenb):
+        command = 'payrollpdf2ancode.sh %s %d' % (filename, pagenb)
+        process = Popen(command.split(), stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            raise ParseError("Return code of command: %d", process.returncode)
+        stdout = stdout.decode('utf-8')
+        stdout = stdout.split('\n')
+        ancode = self.parse_single_value(stdout[0], self._ANCODE_MARKER)
+        name = self.parse_single_value(stdout[1], self._NAME_MARKER)
+        if not name:
+            name = "NO_NAME_FOUND"
+        self.logger.info("Page %d: %s %s", pagenb, ancode, name)
+        return ancode, name
+
+    def parse_single_value(self, value, marker_re):
+        if not marker_re.match(value):
+            raise ParseError("Didn't find expected output marker")
+        return marker_re.sub('', value)
 
 
-class PdfTweaker(object):
 
-    def __init__(self, config, year, month):
-        self.logger = mk_logger('autosplit.tweaker', config)
-        self.config = config
-        self.year = year
-        self.month = month
-        self.last_print_page = 0
-        self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
-        self.pages_to_process = self.config.getvalue('restrict')
+class SituationTweaker(PdfTweaker):
+    _DOCTYPE = 'tresorerie'
+    _UNITARY_TIME = 0.1
 
-        self.identifiers = {}
-
-    def tweak(self, pdfstream):
-        mkdir_p(self.output_dir, self.logger)
-        with open(pdfstream.name, 'r') as duplicate_pdfstream:
-            inputpdf = PdfFileReader(duplicate_pdfstream)
-
-            pages_nb = inputpdf.getNumPages()
-            if not self.pages_to_process:
-                # 0 means no restriction
-                self.pages_to_process = pages_nb
-
-            self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
-            self.logger.info("Estimated time for completion of %d pages on "
-            "an average computer: %.f seconds. Please stand while the parsing"
-            " takes place.", self.pages_to_process, self._UNITARY_TIME*self.pages_to_process)
-
-            start = time.clock()
-
-            self.split_stream(inputpdf, pages_nb)
-
-            duration = time.clock() - start
-            self.logger.info("Total duration: %s seconds, thank you for your patience",
-                duration)
-
-    def split_stream(self, reader, pages_nb):
+    def split_stream(self, filename, reader, pages_nb):
         outlines = reader.getOutlines()
         self.allpages = []
         for index in xrange(pages_nb):
@@ -84,36 +80,13 @@ class PdfTweaker(object):
                 next_startpage = self.findpage(next_ancode)
             else:
                 next_startpage = None
-            outfname = '%s_%s' % (cur_ancode, cur_entr)
-            outfname = "%s/%s.pdf" % (self.output_dir, unix_sanitize(outfname))
+            outfname = self.get_outfname(cur_ancode, cur_entr)
 
             if next_startpage is None:
                 print_all_remaining = True
             self.printpages(print_all_remaining, outfname, next_startpage)
             cur_index = next_index
             next_index += 1
-
-    def printpages(self, print_all_remaining, outfname, next_startpage):
-        output = PdfFileWriter()
-        nb_print_pages = 1
-        if print_all_remaining:
-            for page in self.allpages[self.last_print_page:]:
-                output.addPage(page)
-                nb_print_pages += 1
-                self.last_print_page += 1
-        else:
-            if self.last_print_page == next_startpage:
-                self.logger.warning("2 analytic codes on page %d",
-                    self.last_print_page)
-                output.addPage(self.allpages[self.last_print_page])
-            else:
-                nb_print_pages = next_startpage - self.last_print_page
-                for page in self.allpages[self.last_print_page:next_startpage]:
-                    output.addPage(page)
-                    self.last_print_page += 1
-        with open(outfname, 'w') as wfd:
-            self.logger.info("%d page(s) -> %s", nb_print_pages, outfname)
-            output.write(wfd)
 
 
     def findpage(self, ancode):
@@ -161,20 +134,9 @@ class PdfTweaker(object):
 
 
 
-class PayrollTweaker(PdfTweaker):
-    _DOCTYPE = 'salaire'
-    _UNITARY_TIME = 0.1
-    pass
-
-class SituationTweaker(PdfTweaker):
-    _DOCTYPE = 'tresorerie'
-    _UNITARY_TIME = 0.1
-    pass
-
 class ResultTweaker(PdfTweaker):
     _DOCTYPE = 'resultat'
     _UNITARY_TIME = 0.1
-    pass
 
 DOC_TWEAKERS = {'salaire': PayrollTweaker, 'tresorerie': SituationTweaker,
     'resultat': ResultTweaker}
