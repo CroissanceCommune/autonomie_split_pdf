@@ -19,6 +19,7 @@ class PayrollTweaker(PdfTweaker):
     _NAME_MARKER = re.compile('^NAME ')
 
     def split_stream(self, filename, reader, pages_nb):
+        self.preprocessor = self.config.getvalue('payroll_preprocessor')
         for pagenb in xrange(pages_nb):
             output = PdfFileWriter()
             ancode, name = self.getinfo(filename, pagenb)
@@ -28,7 +29,7 @@ class PayrollTweaker(PdfTweaker):
                 output.write(wfd)
 
     def getinfo(self, filename, pagenb):
-        command = 'payrollpdf2ancode.sh %s %d' % (filename, pagenb)
+        command = [self.preprocessor, filename, pagenb]
         process = Popen(command.split(), stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:

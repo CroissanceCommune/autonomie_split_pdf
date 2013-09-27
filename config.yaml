@@ -1,1 +1,1 @@
-{loglevel: 10, use_syslog: true, verbosity: DEBUG}
+{loglevel: 10, use_syslog: true, verbosity: DEBUG, payroll_preprocessor: ./payroll2ancode.sh}
