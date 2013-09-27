@@ -88,7 +88,7 @@ class PdfTweaker(object):
             else:
                 next_startpage = None
             outfname = '%s_%s.pdf' % (cur_entr, cur_ancode)
-            outfname = "%s/%s" % (self.output_dir, outfname.replace('/', '_'))
+            outfname = "%s/%s" % (unix_sanitize(outfname), self.output_dir)
 
             if next_startpage is None:
                 print_all_remaining = True
@@ -189,17 +189,6 @@ class PdfTweaker(object):
 
         self.logger.critical('%s NOT FOUND at position %s', position_name, xpath_expr)
         raise ValueNotFound(page)
-
-    def abort(self, exc):
-        page = exc.args[0]
-        debug_fname = 'debug-page_%s.xml' % page.get('id', 'PAGE_ID')
-        with open(debug_fname, 'w') as debug_fd:
-            debug_fd.write(etree.tostring(page))
-        self.logger.critical("Aborting, page dumped to %s", debug_fname)
-        self.logger.critical("Now halting for analysis")
-        import sys
-        sys.exit(4)
-
 
 class Sheet(object):
     def __init__(self, p_nr, analytic, config, append=False):
