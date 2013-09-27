@@ -112,7 +112,7 @@ class PdfTweaker(object):
                     output.addPage(page)
                     self.last_print_page += 1
         with open(outfname, 'w') as wfd:
-            self.logger.info("|| | %d page(s) -> %s", nb_print_pages, outfname)
+            self.logger.info("%d page(s) -> %s", nb_print_pages, outfname)
             output.write(wfd)
 
 
@@ -147,7 +147,7 @@ class PdfTweaker(object):
                     maintitle = title
                 elif level == 1:
                     entrepreneur = title
-                self.logger.info("||%s- %s", ' '*level, title)
+                self.logger.info("%s- %s", '|'*(level + 1), title)
             else:
                 if isinstance(destination, Iterable):
                     for item in self.browse(destination,
@@ -159,188 +159,22 @@ class PdfTweaker(object):
                     self.logger.warning("Skipping entry of type %s" %
                         type(destination))
 
-    def sanitize_validate(self, page, value, value_name):
-        """
-        Stops the process if the read value is detected incorrect.
-        Dumps debug.xml for the current page
-
-        We cannot validate names (known problem in IT) but we should try and
-        sanitize input..
-        """
-        if value is not None:
-            return unix_sanitize(value)
-
-        self.logger.critical("invalid %s read: %s", value_name, value)
-        raise ValueNotFound()
-
-    def search(self, page, position_name):
-        xpath_expr = self._XPATH_EXPR[position_name]
-        for textbox in page.xpath(xpath_expr[0], **xpath_expr[1]):
-            # sometimes, the first textbox is empty, we iterate.
-            value = ''.join(etext.text
-                for etext in textbox.xpath('text')
-                ).strip()
-            sanitized = self.sanitize_validate(page, unicode(value), position_name)
-
-            return sanitized
-
-        self.logger.critical('%s NOT FOUND at position %s', position_name, xpath_expr)
-        raise ValueNotFound(page)
-
-class Sheet(object):
-    def __init__(self, p_nr, analytic, config, append=False):
-
-        """
-        :param int p_nr: 1 indexed page number -human numeration
-        :param str analytic: analytic code
-        :param config: Running config
-        :type config: autosplit.config.Config
-        """
-        self.usertype = self.__class__.__name__.lower()
-        self.logger = mk_logger('autosplit.%s' %
-            self.usertype, config)
-        self.p_nr = p_nr
-        self.analytic = analytic or 'PAS-DE-CODE-ANALYTIQUE'
-        self.append = append
-
-        self.crea_info()
-
-    def crea_info(self):
-        if self.append:
-            self.logger.info("page %d will be appended to the previous one")
-            return
-        self.logger.info("page %d is a %s for analytic_code %s",
-            self.p_nr, self.usertype, self.analytic)
-
-    def get_index(self):
-        """
-        :return: page nb, 0 indexed.
-        """
-        return self.p_nr - 1
-
-    def _getfilename(self):
-        return '%s.pdf' % self.analytic
-
-    def getfilename(self, other=None):
-        if other is not None:
-            return other.getfilename()
-        return self._getfilename()
-
-
-class PaySheet(Sheet):
-    def __init__(self, p_nr, analytic, name, config):
-        """
-        :param str name: firstname+lastname
-        """
-        self.name = name
-        Sheet.__init__(self, p_nr, analytic, config)
-
-    def crea_info(self):
-        self.logger.info("page %d is a paysheet for %s, (analytic_code: %s)",
-            self.p_nr, self.name, self.analytic)
-
-
-    def _getfilename(self):
-        return '%s_%s.pdf' % (self.analytic, self.name)
-
-
-regexpNS = "http://exslt.org/regular-expressions"
 
 
 class PayrollTweaker(PdfTweaker):
-    _UNITARY_TIME = 0.1
     _DOCTYPE = 'salaire'
-    _XPATH_EXPR = {
-        'name': (
-            'textbox[re:match(@bbox, "^[0-9]{3}.560,665.390")]/textline[1]',
-            {'namespaces': {'re': regexpNS}}
-            ),
-        'analytic_code': (
-            'textbox[re:match(@bbox, '
-            '"^[0-9]{3}.560,684.911,[0-9]{3}.[0-9]{3},692.693")]/textline[1]',
-            {'namespaces': {'re': regexpNS}}
-            )
-        }
-
-    def get_identifier(self, pdfstream, pageindex):
-        pdfstream.seek(0)
-        tree = self._toxml(pdfstream, pageindex)
-        page = tree.xpath('/pages/page')[0]
-        self.logger.debug("Parsing XML for page %d", pageindex + 1)
-        analytic_code = self.search(page, 'analytic_code')
-        name = self.search(page, 'name')
-        return PaySheet(pageindex + 1, analytic_code, name, self.config)
-
-
-class SituationSheet(Sheet):
+    _UNITARY_TIME = 0.1
     pass
 
 class SituationTweaker(PdfTweaker):
-    _UNITARY_TIME = 0.4
     _DOCTYPE = 'tresorerie'
-    _XPATH_EXPR = {
-        'analytic_code': (
-            'textbox[re:match(@bbox, '
-            '"^25.671,[0-9]{3}.[0-9]{3},[0-9]{2}.[0-9]{3},5[0-9]{2}.[0-9]{3}")]'
-            '/textline[1]',
-            {'namespaces': {'re': regexpNS}}
-            )
-        }
-
-    def get_identifier(self, pdfstream, pageindex):
-        pdfstream.seek(0)
-        tree = self._toxml(pdfstream, pageindex)
-        page = tree.xpath('/pages/page')[0]
-        self.logger.debug("Parsing XML for page %d", pageindex + 1)
-        append = False
-        try:
-            analytic_code = self.search(page, 'analytic_code')
-        except ValueNotFound:
-            self.logger.warning('Value of analytic code not found on page %d.'
-                'We bet it belongs to the previous page', pageindex + 1)
-            analytic_code = None
-            append = True
-        identifier = SituationSheet(pageindex + 1, analytic_code, self.config,
-            append=append)
-        self.identifiers[pageindex] = identifier
-        return identifier
-
-
-class ResultSheet(Sheet):
+    _UNITARY_TIME = 0.1
     pass
 
-
 class ResultTweaker(PdfTweaker):
-    _UNITARY_TIME = 1
     _DOCTYPE = 'resultat'
-    _XPATH_EXPR = {
-        'analytic_code': (
-            'textbox[re:match(@bbox, '
-            '"^190.431,5[0-9]{2}.[0-9]{3},2[0-9]{2}.[0-9]{3},5[0-9]{2}.[0-9]{3}")]/textline[1]',
-            {'namespaces': {'re': regexpNS}}
-            )
-        }
-
-    I = 0
-    def get_identifier(self, pdfstream, pageindex):
-        pdfstream.seek(0)
-        tree = self._toxml(pdfstream, pageindex)
-        page = tree.xpath('/pages/page')[0]
-        self.logger.debug("Parsing XML for page %d", pageindex + 1)
-        try:
-            analytic_code = self.search(page, 'analytic_code')
-        except:
-            if ResultTweaker.I > 0:
-                raise
-            ResultTweaker.I += 1
-            analytic_code = None
-        return ResultSheet(pageindex + 1, analytic_code, self.config)
-
-class AutosplitError(Exception): pass
-
-
-class ValueNotFound(AutosplitError): pass
-
+    _UNITARY_TIME = 0.1
+    pass
 
 DOC_TWEAKERS = {'salaire': PayrollTweaker, 'tresorerie': SituationTweaker,
     'resultat': ResultTweaker}
