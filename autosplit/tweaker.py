@@ -6,7 +6,6 @@ from collections import Iterable
 import re
 from subprocess import Popen, PIPE
 
-from PyPDF2 import PdfFileWriter
 from PyPDF2.pdf import Destination
 
 from .tweaker_base import PdfTweaker
@@ -23,17 +22,30 @@ class PayrollTweaker(PdfTweaker):
     _ANCODE_MARKER = re.compile('^ANCODE ')
     _NAME_MARKER = re.compile('^NAME ')
 
-    def split_stream(self, filename, reader, pages_nb):
-        self.preprocessor = self.config.getvalue('payroll_preprocessor')
+    def addpages(self, output, reader, pagenb):
+        page = self.allpages[pagenb]
+        output.addPage(page)
+        return 1
+
+    def getdata(self, pages_nb, filename):
+        self.alldata = []
+
         for pagenb in xrange(pages_nb):
-            output = PdfFileWriter()
             ancode, name = self._getinfo(filename, pagenb)
-            page = reader.getPage(pagenb)
-            output.addPage(page)
+            self.alldata.append((name, ancode))
+        return True
+
+    def split_stream(self, filename, reader, pages_nb):
+        self.register_pages(reader, pages_nb)
+        self.preprocessor = self.config.getvalue('payroll_preprocessor')
+
+        self.getdata(pages_nb, filename)
+
+        for pagenb in xrange(pages_nb):
+            name, ancode = self.alldata[pagenb]
             outfname = self.get_outfname(ancode, name)
-            with open(outfname, 'w') as wfd:
-                self.logger.info("%s - %s -> %s", ancode, name, outfname)
-                output.write(wfd)
+
+            self.printpages(outfname, reader, pagenb)
 
     def _getinfo(self, filename, pagenb):
         command = [self.preprocessor, filename, '%d' % pagenb]
@@ -60,20 +72,23 @@ class SituationTweaker(PdfTweaker):
     _DOCTYPE = 'tresorerie'
     _UNITARY_TIME = 0.1
 
-    def split_stream(self, filename, reader, pages_nb):
+    def getdata(self, reader):
         outlines = reader.getOutlines()
-        self.allpages = []
-        for index in xrange(pages_nb):
-            current_page = reader.getPage(index)
-            self.allpages.append(current_page)
         self.alldata = []
 
         self.logger.info("Parsing outlines. Output below")
         for entrepreneur, ancode in self.browse(outlines):
             self.alldata.append((entrepreneur, ancode))
 
-        if not self.alldata:
-            self.logger.critical("could not parse outlines?!")
+        if self.alldata:
+            return True
+
+        self.logger.critical("could not parse outlines?!")
+        return False
+
+    def split_stream(self, filename, reader, pages_nb):
+        self.register_pages(reader, pages_nb)
+        if not self.getdata(reader):
             return
 
         cur_index = 0
@@ -91,7 +106,7 @@ class SituationTweaker(PdfTweaker):
 
             if next_startpage is None:
                 print_all_remaining = True
-            self.printpages(print_all_remaining, outfname, next_startpage)
+            self.printpages(outfname, print_all_remaining, next_startpage)
             cur_index = next_index
             next_index += 1
 
@@ -106,6 +121,27 @@ class SituationTweaker(PdfTweaker):
                     "search aborted", ancode)
                 return None
         return None
+
+    def addpages(self, output, print_all_remaining, next_startpage):
+        nb_print_pages = 1
+
+        if print_all_remaining:
+            for page in self.allpages[self.last_print_page:]:
+                output.addPage(page)
+                nb_print_pages += 1
+                self.last_print_page += 1
+            return nb_print_pages
+
+        if self.last_print_page == next_startpage:
+            self.logger.warning("2 analytic codes on page %d",
+                self.last_print_page)
+            output.addPage(self.allpages[self.last_print_page])
+        else:
+            nb_print_pages = next_startpage - self.last_print_page
+            for page in self.allpages[self.last_print_page:next_startpage]:
+                output.addPage(page)
+                self.last_print_page += 1
+        return nb_print_pages
 
     def browse(
             self,

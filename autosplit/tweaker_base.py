@@ -57,24 +57,18 @@ class PdfTweaker(object):
             self.logger.info("Total duration: %s seconds, thank you for your patience",
                 duration)
 
-    def printpages(self, print_all_remaining, outfname, next_startpage):
+    def register_pages(self, reader, pages_nb):
+        self.allpages = []
+        for index in xrange(pages_nb):
+            current_page = reader.getPage(index)
+            self.allpages.append(current_page)
+
+    def printpages(self, outfname, *args):
+        """
+        all args are passed to implementation specific addpage().
+        """
         output = PdfFileWriter()
-        nb_print_pages = 1
-        if print_all_remaining:
-            for page in self.allpages[self.last_print_page:]:
-                output.addPage(page)
-                nb_print_pages += 1
-                self.last_print_page += 1
-        else:
-            if self.last_print_page == next_startpage:
-                self.logger.warning("2 analytic codes on page %d",
-                    self.last_print_page)
-                output.addPage(self.allpages[self.last_print_page])
-            else:
-                nb_print_pages = next_startpage - self.last_print_page
-                for page in self.allpages[self.last_print_page:next_startpage]:
-                    output.addPage(page)
-                    self.last_print_page += 1
+        nb_print_pages = self.addpages(output, *args)
         with open(outfname, 'w') as wfd:
             self.logger.info("%d page(s) -> %s", nb_print_pages, outfname)
             output.write(wfd)
