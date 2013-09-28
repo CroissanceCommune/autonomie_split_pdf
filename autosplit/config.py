@@ -16,7 +16,15 @@ class Config(object):
     DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,
     'restrict': 0, 'payroll_preprocessor': './payrollpdf2ancode.sh'}
 
-    def __init__(self, parsed_args):
+    _INSTANCE = None
+
+    @classmethod
+    def getinstance(cls):
+        if cls._INSTANCE is None:
+            cls._INSTANCE = Config()
+        return cls._INSTANCE
+
+    def load_args(self, parsed_args):
         configstream = parsed_args.configfile
         self.confvalues = deepcopy(self.DEFAULTS)
         self.parsed_args = parsed_args

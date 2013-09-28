@@ -7,6 +7,7 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 
 from .file_operations import mkdir_p
 from .log_config import mk_logger
+from .config import Config
 
 
 _UNIX_VALID = re.compile('[^\w\s-]')
@@ -21,8 +22,9 @@ def unix_sanitize(some_name):
 
 class PdfTweaker(object):
 
-    def __init__(self, config, year, month):
-        self.logger = mk_logger('autosplit.tweaker', config)
+    def __init__(self, year, month):
+        self.logger = mk_logger('autosplit.tweaker')
+        config = Config.getinstance()
         self.config = config
         self.year = year
         self.month = month
@@ -34,7 +36,7 @@ class PdfTweaker(object):
 
     def tweak(self, pdfstream):
         mkdir_p(self.output_dir, self.logger)
-        with open(pdfstream.name, 'r') as duplicate_pdfstream:
+        with open(pdfstream.name, 'rb') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
 
             pages_nb = inputpdf.getNumPages()

@@ -56,9 +56,9 @@ def main():
         print(version())
         return
 
-    config = Config(arguments)
-    logger = mk_logger("autosplit.main", config)
-
+    config = Config.getinstance()
+    config.load_args(arguments)
+    logger = mk_logger("autosplit.main")
     logger.info(version())
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
     limit = config.getvalue('restrict')
@@ -74,7 +74,7 @@ def main():
         doctype = parsed.group('DOCTYPE')
         year =  parsed.group('YEAR')
         month =  parsed.group('MONTH')
-        tweaker = DOC_TWEAKERS[doctype](config, year, month)
+        tweaker = DOC_TWEAKERS[doctype](year, month)
 
         #argparse has already open the files
         logger.info('Loading PDF "%s"', openfile.name)
