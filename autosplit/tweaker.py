@@ -22,7 +22,7 @@ class PayrollTweaker(PdfTweaker):
     _ANCODE_MARKER = re.compile('^ANCODE ')
     _NAME_MARKER = re.compile('^NAME ')
 
-    def addpages(self, output, reader, pagenb):
+    def addpages(self, output, pagenb):
         page = self.allpages[pagenb]
         output.addPage(page)
         return 1
@@ -31,6 +31,7 @@ class PayrollTweaker(PdfTweaker):
         self.alldata = []
 
         for pagenb in xrange(pages_nb):
+            # Perhaps here, add a try/except ParseError and ignore buggy page
             ancode, name = self._getinfo(filename, pagenb)
             self.alldata.append((name, ancode))
         return True
@@ -42,10 +43,7 @@ class PayrollTweaker(PdfTweaker):
         self.getdata(pages_nb, filename)
 
         for pagenb in xrange(pages_nb):
-            name, ancode = self.alldata[pagenb]
-            outfname = self.get_outfname(ancode, name)
-
-            self.printpages(outfname, reader, pagenb)
+            self.printpages(pagenb)
 
     def _getinfo(self, filename, pagenb):
 
@@ -100,18 +98,16 @@ class SituationTweaker(PdfTweaker):
         next_index = 1
         while self.last_print_page < pages_nb:
             print_all_remaining = False
-            cur_entr, cur_ancode = self.alldata[cur_index]
             if next_index < len(self.alldata):
                 next_entr, next_ancode = self.alldata[next_index]
                 # may be None here also:
                 next_startpage = self.findpage(next_ancode)
             else:
                 next_startpage = None
-            outfname = self.get_outfname(cur_ancode, cur_entr)
 
             if next_startpage is None:
                 print_all_remaining = True
-            self.printpages(outfname, print_all_remaining, next_startpage)
+            self.printpages(cur_index, print_all_remaining, next_startpage)
             cur_index = next_index
             next_index += 1
 
@@ -127,7 +123,7 @@ class SituationTweaker(PdfTweaker):
                 return None
         return None
 
-    def addpages(self, output, print_all_remaining, next_startpage):
+    def addpages(self, output, current_page, print_all_remaining, next_startpage):
         """
         :arg bool print_all_remaining: should we print all the remainder (stop
         splitting)
@@ -140,7 +136,7 @@ class SituationTweaker(PdfTweaker):
             for index, page in enumerate(self.allpages[self.last_print_page:]):
                 output.addPage(page)
                 self.last_print_page += 1
-            return index
+            return index + 1
 
         if self.last_print_page == next_startpage:
             self.logger.warning(

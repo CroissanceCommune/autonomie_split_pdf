@@ -64,12 +64,15 @@ class PdfTweaker(object):
             current_page = reader.getPage(index)
             self.allpages.append(current_page)
 
-    def printpages(self, outfname, *args):
+    def printpages(self, pagenb, *args):
         """
-        all args are passed to implementation specific addpage().
+        *args are passed to implementation specific addpage(), prepended by
+        the PdfFileWriter and pagenb
         """
         output = PdfFileWriter()
-        nb_print_pages = self.addpages(output, *args)
+        nb_print_pages = self.addpages(output, pagenb, *args)
+        name, ancode = self.alldata[pagenb]
+        outfname = self.get_outfname(ancode, name)
         with open(outfname, 'w') as wfd:
             self.logger.info("%d page(s) -> %s", nb_print_pages, outfname)
             output.write(wfd)
