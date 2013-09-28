@@ -1,3 +1,7 @@
+"""
+Concrete implementations of tweakers that split pdf files
+"""
+
 from collections import Iterable
 import re
 from subprocess import Popen, PIPE
@@ -5,7 +9,7 @@ from subprocess import Popen, PIPE
 from PyPDF2 import PdfFileWriter
 from PyPDF2.pdf import Destination
 
-from .tweaker_base import PdfTweaker, unix_sanitize
+from .tweaker_base import PdfTweaker
 
 
 class ParseError(Exception):
@@ -15,6 +19,7 @@ class ParseError(Exception):
 class PayrollTweaker(PdfTweaker):
     _DOCTYPE = 'salaire'
     _UNITARY_TIME = 0.1
+
     _ANCODE_MARKER = re.compile('^ANCODE ')
     _NAME_MARKER = re.compile('^NAME ')
 
@@ -22,7 +27,7 @@ class PayrollTweaker(PdfTweaker):
         self.preprocessor = self.config.getvalue('payroll_preprocessor')
         for pagenb in xrange(pages_nb):
             output = PdfFileWriter()
-            ancode, name = self.getinfo(filename, pagenb)
+            ancode, name = self._getinfo(filename, pagenb)
             page = reader.getPage(pagenb)
             output.addPage(page)
             outfname = self.get_outfname(ancode, name)
@@ -30,7 +35,7 @@ class PayrollTweaker(PdfTweaker):
                 self.logger.info("%s - %s -> %s", ancode, name, outfname)
                 output.write(wfd)
 
-    def getinfo(self, filename, pagenb):
+    def _getinfo(self, filename, pagenb):
         command = [self.preprocessor, filename, '%d' % pagenb]
         process = Popen(command, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
@@ -49,7 +54,6 @@ class PayrollTweaker(PdfTweaker):
         if not marker_re.match(value):
             raise ParseError("Didn't find expected output marker")
         return marker_re.sub('', value)
-
 
 
 class SituationTweaker(PdfTweaker):
@@ -91,23 +95,25 @@ class SituationTweaker(PdfTweaker):
             cur_index = next_index
             next_index += 1
 
-
     def findpage(self, ancode):
         for index, page in enumerate(self.allpages[self.last_print_page:]):
             text = page.extractText()
             if ancode in text:
                 return self.allpages.index(page)
             if index > 10:
-                self.logger.info("Browsed 10 pages without finding code %s,"
-                "search aborted", ancode)
+                self.logger.info(
+                    "Browsed 10 pages without finding code %s,"
+                    "search aborted", ancode)
                 return None
         return None
 
-
-    def browse(self, outline,
-        level=0,
-        maintitle='',
-        entrepreneur=''):
+    def browse(
+            self,
+            outline,
+            level=0,
+            maintitle='',
+            entrepreneur=''
+            ):
         """
         Recurses through outlines, yielding only when we have anaytic codes
 
@@ -126,20 +132,26 @@ class SituationTweaker(PdfTweaker):
                 self.logger.info("%s- %s", '|'*(level + 1), title)
             else:
                 if isinstance(destination, Iterable):
-                    for item in self.browse(destination,
-                        level + 1,
-                        maintitle,
-                        entrepreneur):
+                    for item in self.browse(
+                            destination,
+                            level + 1,
+                            maintitle,
+                            entrepreneur
+                            ):
                         yield item
                 else:
-                    self.logger.warning("Skipping entry of type %s" %
-                        type(destination))
-
+                    self.logger.warning(
+                        "Skipping entry of type %s" %
+                        type(destination)
+                        )
 
 
 class ResultTweaker(PdfTweaker):
     _DOCTYPE = 'resultat'
     _UNITARY_TIME = 0.1
 
-DOC_TWEAKERS = {'salaire': PayrollTweaker, 'tresorerie': SituationTweaker,
-    'resultat': ResultTweaker}
+DOC_TWEAKERS = {
+    'salaire': PayrollTweaker,
+    'tresorerie': SituationTweaker,
+    'resultat': ResultTweaker
+    }

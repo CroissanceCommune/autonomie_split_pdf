@@ -1,3 +1,17 @@
+"""
+Autosplitter for pdf files
+"""
+
+__author__ = "Feth Arezki, Julien Miotte, Gaston Tjebbes"
+__copyright__ = "Copyright 2013, Majerti"
+__credits__ = ["Feth Arezki", "Julien Miotte", "Gaston Tjebbes",]
+__license__ = "AGPLv3"
+__version__ = "1RC"
+__maintainer__ = "Feth Arezki"
+__email__ = "feth@majerti.fr"
+__status__ = "Development"
+
+
 import os.path
 import re
 
@@ -8,6 +22,10 @@ from .tweaker import DOC_TWEAKERS
 
 _FILENAMESRE = re.compile(r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
     '[0-9]+)_(?P<MONTH>[^_]+)\.pdf')
+
+
+def version():
+    return 'autosplit version: %s' % __version__
 
 
 def main():
@@ -27,13 +45,21 @@ def main():
                         help='verbose output', default=False)
     parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
                         type=int, default=0)
+    parser.add_argument('-V', '--version', action='store_const', const=True,
+                        help='version', default=False)
 
     arguments = parser.parse_args()
+
+    if arguments.version:
+        print(version())
+        return
+
     config = Config(arguments)
     logging.basicConfig(level=config.getvalue('loglevel'),
-                        format="%(asctime)s [%(name)-20s][%(levelname)-8s] %(message)s")
+                        format="%(asctime)s [pid %(process)s][%(name)-20s][%(levelname)-8s] %(message)s")
     logger = mk_logger("autosplit.main", config)
 
+    logger.info(version())
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
     limit = config.getvalue('restrict')
     if limit != 0:
