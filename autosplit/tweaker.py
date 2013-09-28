@@ -48,7 +48,12 @@ class PayrollTweaker(PdfTweaker):
             self.printpages(outfname, reader, pagenb)
 
     def _getinfo(self, filename, pagenb):
-        command = [self.preprocessor, filename, '%d' % (pagenb + 1)]
+
+        # Warning: 1 - indexed page number for pdftotext, while the current
+        # software and PyPDF2 API use 0 - index.
+        pdftotext_pagenb = pagenb + 1
+
+        command = [self.preprocessor, filename, '%d' % pdftotext_pagenb]
         process = Popen(command, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
