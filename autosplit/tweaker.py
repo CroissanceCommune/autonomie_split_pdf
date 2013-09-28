@@ -48,7 +48,7 @@ class PayrollTweaker(PdfTweaker):
             self.printpages(outfname, reader, pagenb)
 
     def _getinfo(self, filename, pagenb):
-        command = [self.preprocessor, filename, '%d' % pagenb]
+        command = [self.preprocessor, filename, '%d' % (pagenb + 1)]
         process = Popen(command, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
