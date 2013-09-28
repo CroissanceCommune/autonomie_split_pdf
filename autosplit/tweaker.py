@@ -23,6 +23,8 @@ class PayrollTweaker(PdfTweaker):
         for pagenb in xrange(pages_nb):
             output = PdfFileWriter()
             ancode, name = self.getinfo(filename, pagenb)
+            page = reader.getPage(pagenb)
+            output.addPage(page)
             outfname = self.get_outfname(ancode, name)
             with open(outfname, 'w') as wfd:
                 self.logger.info("%s - %s -> %s", ancode, name, outfname)
