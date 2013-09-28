@@ -32,8 +32,6 @@ class PdfTweaker(object):
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
         self.pages_to_process = self.config.getvalue('restrict')
 
-        self.identifiers = {}
-
     def tweak(self, pdfstream):
         mkdir_p(self.output_dir, self.logger)
         with open(pdfstream.name, 'rb') as duplicate_pdfstream:
@@ -45,10 +43,13 @@ class PdfTweaker(object):
                 self.pages_to_process = pages_nb
 
             self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
-            self.logger.info("Estimated time for completion of %d pages on "
-            "an average computer: %.f seconds. Please stand while the parsing"
-            " takes place.", self.pages_to_process, self._UNITARY_TIME*self.pages_to_process)
-
+            self.logger.info(
+                "Estimated time for completion of %d pages on "
+                "an average computer: %.f seconds. Please stand while "
+                "the parsing takes place.",
+                self.pages_to_process,
+                self._UNITARY_TIME*self.pages_to_process
+                )
             start = time.clock()
 
             self.split_stream(pdfstream.name, inputpdf, pages_nb)
@@ -76,4 +77,3 @@ class PdfTweaker(object):
     def get_outfname(self, ancode, entrepreneur):
         outfname = '%s_%s' % (ancode, entrepreneur)
         return "%s/%s.pdf" % (self.output_dir, unix_sanitize(outfname))
-

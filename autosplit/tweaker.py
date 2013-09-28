@@ -123,25 +123,35 @@ class SituationTweaker(PdfTweaker):
         return None
 
     def addpages(self, output, print_all_remaining, next_startpage):
-        nb_print_pages = 1
+        """
+        :arg bool print_all_remaining: should we print all the remainder (stop
+        splitting)
+        :arg int next_startpage: page until which we print
+
+        I think there is a bug in the content of alldata, but it seems to work
+        """
 
         if print_all_remaining:
-            for page in self.allpages[self.last_print_page:]:
+            for index, page in enumerate(self.allpages[self.last_print_page:]):
                 output.addPage(page)
-                nb_print_pages += 1
                 self.last_print_page += 1
-            return nb_print_pages
+            return index
 
         if self.last_print_page == next_startpage:
-            self.logger.warning("2 analytic codes on page %d",
-                self.last_print_page)
+            self.logger.warning(
+                "2 analytic codes on page %d (%s and %s)",
+                self.last_print_page, *[
+                    self.alldata[pnum][1] for pnum in (self.last_print_page,
+                    self.last_print_page + 1)
+                    ]
+                )
             output.addPage(self.allpages[self.last_print_page])
-        else:
-            nb_print_pages = next_startpage - self.last_print_page
-            for page in self.allpages[self.last_print_page:next_startpage]:
-                output.addPage(page)
-                self.last_print_page += 1
-        return nb_print_pages
+            return 1
+
+        for page in self.allpages[self.last_print_page:next_startpage]:
+            output.addPage(page)
+            self.last_print_page += 1
+        return next_startpage - self.last_print_page + 1
 
     def browse(
             self,
