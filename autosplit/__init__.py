@@ -4,7 +4,7 @@ Autosplitter for pdf files
 
 __author__ = "Feth Arezki, Julien Miotte, Gaston Tjebbes"
 __copyright__ = "Copyright 2013, Majerti"
-__credits__ = ["Feth Arezki", "Julien Miotte", "Gaston Tjebbes",]
+__credits__ = ["Feth Arezki", "Julien Miotte", "Gaston Tjebbes"]
 __license__ = "AGPLv3"
 __version__ = "1RC"
 __maintainer__ = "Feth Arezki"
@@ -20,8 +20,10 @@ from .log_config import mk_logger
 from .tweaker import DOC_TWEAKERS
 
 
-_FILENAMESRE = re.compile(r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
-    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf')
+_FILENAMESRE = re.compile(
+    r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
+    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf'
+    )
 
 
 def version():
@@ -55,8 +57,6 @@ def main():
         return
 
     config = Config(arguments)
-    logging.basicConfig(level=config.getvalue('loglevel'),
-                        format="%(asctime)s [pid %(process)s][%(name)-20s][%(levelname)-8s] %(message)s")
     logger = mk_logger("autosplit.main", config)
 
     logger.info(version())
