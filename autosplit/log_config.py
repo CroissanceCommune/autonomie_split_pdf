@@ -43,6 +43,14 @@ def log_exception(logger):
         if line:
             logger.debug("exc info: %s", line)
 
+_MAIL_TEMPLATE = u"""
+Following are all messages logged by the PDF splitter for
+autonomie on this run:
+
+
+%s
+"""
+
 def mk_logger(name):
     """
     returns a logger with the name supplied.
@@ -69,13 +77,7 @@ def mk_logger(name):
             mail_subject = config.getvalue(('mail', 'subject')) % {
                 'hostname': socket.gethostname(),
             }
-            mail_template = u"""
-            Following are all messages logged by the PDF splitter for
-            autonomie on this run:
-
-
-            %s
-            """
+            mail_template = _MAIL_TEMPLATE
             _MAILLOG_HANDLER = SummarisingLogger(
                 config.getvalue(('mail', 'from')),
                 config.getvalue(('mail', 'to')),

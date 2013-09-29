@@ -7,8 +7,8 @@
         preprocessor: ./payrollpdf2ancode.sh,
     },
     mail: {
-        host: smtp.free.fr,
+        host: smtp.example.fr,
         from: autonomie@majerti.fr,
-        to: feth@tuttu.info,
+        to: autonomie@majerti.fr, # supports a list of addresses!
         subject: '[%(hostname)s] Log of autonomie pdf splitter',
         }}
