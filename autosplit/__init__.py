@@ -47,14 +47,11 @@ def main():
                         help='verbose output', default=False)
     parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
                         type=int, default=0)
-    parser.add_argument('-V', '--version', action='store_const', const=True,
-                        help='version', default=False)
+    parser.add_argument('-V', '--version', action='version',
+                    version="%%(prog)s (pdf split for autonomie version %s)" %
+                        __version__)
 
     arguments = parser.parse_args()
-
-    if arguments.version:
-        print(version())
-        return
 
     config = Config.getinstance()
     config.load_args(arguments)
