@@ -1,5 +1,6 @@
 import logging
 from logging import handlers
+import traceback
 
 from .config import Config
 
@@ -22,6 +23,22 @@ def _log_init():
         format=_LOGFORMAT
         )
 
+def log_exception(logger):
+    """
+    print exception trace lines one by one.
+
+    workaround for my syslog not registering multi lines
+
+    an rsyslog workaround would be
+      $EscapeControlCharactersOnReceive off
+
+    another workaround would be the registering of 1 line only with newlines
+    substitued (log being harder to read afterwards).
+    """
+    for line in traceback.format_exc().split('\n'):
+        line = line.strip()
+        if line:
+            logger.debug("exc info: %s", line)
 
 def mk_logger(name):
     """

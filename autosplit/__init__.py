@@ -16,7 +16,7 @@ import os.path
 import re
 
 from .config import Config, DEFAULT_CONFIGFILE
-from .log_config import mk_logger
+from .log_config import log_exception, mk_logger
 from .tweaker import DOC_TWEAKERS
 
 
@@ -35,7 +35,6 @@ def main():
     Method to call from the command line. Parses sys.argv arguments.
     """
     import argparse
-    import logging
 
     parser = argparse.ArgumentParser(description='Sage files parsing')
     parser.add_argument('files', type=argparse.FileType('r'),
@@ -77,9 +76,10 @@ def main():
         logger.info('Loading PDF "%s"', openfile.name)
         try:
             tweaker.tweak(openfile)
-        except:
-            logging.exception("Exception not handled by the splitter, that's a"
-            "bug, sorry")
+        except BaseException:
+            logger.exception("Exception not handled by the splitter, that's a "
+            "bug, sorry.")
+            log_exception()
             raise
 
 __all__ = 'PdfTweaker', 'Config'

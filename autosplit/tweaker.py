@@ -58,11 +58,13 @@ class PayrollTweaker(PdfTweaker):
         if process.returncode != 0:
             raise ParseError("Return code of command: %d", process.returncode)
         stdout = stdout.decode('utf-8')
-        stdout = stdout.split('\n')
-        ancode = self.parse_single_value(stdout[0], self._ANCODE_MARKER)
-        name = self.parse_single_value(stdout[1], self._NAME_MARKER)
+        stdout_lines = stdout.split('\n')
+        ancode = self.parse_single_value(stdout_lines[0], self._ANCODE_MARKER)
+        name = self.parse_single_value(stdout_lines[1], self._NAME_MARKER)
+
         if not name:
             name = "NO_NAME_FOUND"
+
         self.logger.info("Page %d: %s %s", pagenb, ancode, name)
         return ancode, name
 
