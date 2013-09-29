@@ -1,2 +1,3 @@
 PyYAML
 PyPDF2
+mailinglogger
