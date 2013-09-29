@@ -6,7 +6,6 @@ import traceback
 from mailinglogger import SummarisingLogger
 
 from .config import Config
-import log_smtp
 
 
 _INITIALIZED = False
