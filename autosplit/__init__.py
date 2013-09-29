@@ -79,7 +79,7 @@ def main():
         except BaseException:
             logger.exception("Exception not handled by the splitter, that's a "
             "bug, sorry.")
-            log_exception()
+            log_exception(logger)
             raise
 
 __all__ = 'PdfTweaker', 'Config'
