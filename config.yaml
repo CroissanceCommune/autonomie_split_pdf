@@ -1,1 +1,14 @@
-{loglevel: 10, use_syslog: true, verbosity: DEBUG, payroll_preprocessor: ./payroll2ancode.sh}
+{
+    loglevel: 10,
+    use_syslog: true,
+    verbosity: DEBUG,
+    log_to_mail: true,
+    payroll: {
+        preprocessor: ./payrollpdf2ancode.sh,
+    },
+    mail: {
+        host: smtp.free.fr,
+        from: autonomie@majerti.fr,
+        to: feth@tuttu.info,
+        subject: '[%(hostname)s] Log of autonomie pdf splitter',
+        }}

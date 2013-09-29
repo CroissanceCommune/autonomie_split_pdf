@@ -1,23 +1,26 @@
 import logging
 from logging import handlers
+import socket
 import traceback
 
+from mailinglogger import SummarisingLogger
+
 from .config import Config
+import log_smtp
 
 
 _INITIALIZED = False
-_SYSLOG_HANDLER = None
+_MAILLOG_HANDLER = _SYSLOG_HANDLER = None
 _LOGFORMAT = \
             "%(asctime)s [pid %(process)s][%(name)-20s]" \
             "[%(levelname)-8s] %(message)s"
 
-def _log_init():
+def _log_init(config):
     """
     To be called once, after the desired log level is known
 
     we fetch the log level in the config
     """
-    config = Config.getinstance()
     logging.basicConfig(
         level=config.getvalue('loglevel'),
         format=_LOGFORMAT
@@ -45,9 +48,9 @@ def mk_logger(name):
     returns a logger with the name supplied.
     """
     config = Config.getinstance()
-    global _INITIALIZED, _SYSLOG_HANDLER
+    global _INITIALIZED, _MAILLOG_HANDLER, _SYSLOG_HANDLER
     if not _INITIALIZED:
-        _log_init()
+        _log_init(config)
         _INITIALIZED = True
     logger = logging.getLogger(name)
     log_level = config.getvalue('loglevel')
@@ -58,7 +61,32 @@ def mk_logger(name):
                 facility=handlers.SysLogHandler.LOG_DAEMON)
             _SYSLOG_HANDLER.setLevel(log_level)
             _SYSLOG_HANDLER.setFormatter(
-                logging.Formatter('[%(name)-17s] - '
+                logging.Formatter('[%(name)-17s %(process)s] - '
                 '%(levelname)s - %(message)s'))
         logger.addHandler(_SYSLOG_HANDLER)
+    if config.getvalue('log_to_mail'):
+        if _MAILLOG_HANDLER is None:
+            mail_subject = config.getvalue(('mail', 'subject')) % {
+                'hostname': socket.gethostname(),
+            }
+            mail_template = u"""
+            Following are all messages logged by the PDF splitter for
+            autonomie on this run:
+
+
+            %s
+            """
+            _MAILLOG_HANDLER = SummarisingLogger(
+                config.getvalue(('mail', 'from')),
+                config.getvalue(('mail', 'to')),
+                mailhost=config.getvalue(('mail', 'host')),
+                subject=mail_subject,
+                send_level=logging.DEBUG,
+                template=mail_template,
+            )
+            _MAILLOG_HANDLER.setFormatter(
+                logging.Formatter('[%(name)-17s %(process)s] - '
+                '%(levelname)s - %(message)s'))
+            _MAILLOG_HANDLER.setLevel(log_level)
+        logger.addHandler(_MAILLOG_HANDLER)
     return logger

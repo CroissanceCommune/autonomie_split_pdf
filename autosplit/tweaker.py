@@ -24,7 +24,7 @@ class PayrollTweaker(PdfTweaker):
 
     def __init__(self, *args):
         PdfTweaker.__init__(self, *args)
-        self.preprocessor = self.config.getvalue('payroll_preprocessor')
+        self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
 
     def addpages(self, output, pagenb):
         page = self.allpages[pagenb]
@@ -53,7 +53,13 @@ class PayrollTweaker(PdfTweaker):
         pdftotext_pagenb = pagenb + 1
 
         command = [self.preprocessor, filename, '%d' % pdftotext_pagenb]
-        process = Popen(command, stdout=PIPE, stderr=PIPE)
+        try:
+            process = Popen(command, stdout=PIPE, stderr=PIPE)
+        except OSError:
+            self.logger.critical(
+                    "Error while trying to run '%s'",
+                    ' '.join(command))
+            raise
         stdout, stderr = process.communicate()
         if process.returncode != 0:
             raise ParseError("Return code of command: %d", process.returncode)

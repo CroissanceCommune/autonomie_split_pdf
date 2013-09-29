@@ -4,7 +4,7 @@ Autosplitter for pdf files
 
 __author__ = "Feth Arezki, Julien Miotte, Gaston Tjebbes"
 __copyright__ = "Copyright 2013, Majerti"
-__credits__ = ["Feth Arezki", "Julien Miotte", "Gaston Tjebbes"]
+__credits__ = ["Feth Arezki", "Julien Miotte", "Gaston Tjebbes", "Vinay Sajip"]
 __license__ = "AGPLv3"
 __version__ = "1RC"
 __maintainer__ = "Feth Arezki"
@@ -12,6 +12,7 @@ __email__ = "feth@majerti.fr"
 __status__ = "Development"
 
 
+import logging
 import os.path
 import re
 
@@ -56,6 +57,7 @@ def main():
     config.load_args(arguments)
     logger = mk_logger("autosplit.main")
     logger.info(version())
+    logger.debug("Current working directory: %s", os.getcwd())
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
     limit = config.getvalue('restrict')
     if limit != 0:
@@ -81,5 +83,7 @@ def main():
             "bug, sorry.")
             log_exception(logger)
             raise
+        finally:
+            logging.shutdown()
 
 __all__ = 'PdfTweaker', 'Config'

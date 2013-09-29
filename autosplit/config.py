@@ -1,6 +1,6 @@
-import os.path as ospath
 from copy import deepcopy
 import logging
+import os.path as ospath
 import yaml
 
 
@@ -31,7 +31,6 @@ class Config(object):
 
         if configstream:
             self.confvalues.update(yaml.load(configstream))
-
         self._setverb()
 
         self.confvalues['restrict'] = self.parsed_args.restrict
@@ -55,7 +54,15 @@ class Config(object):
         with open("config.yaml", "w") as confstream:
             confstream.write(yaml.dump(self.confvalues))
 
-    def getvalue(self, name, override = _UNSET):
+    def getvalue(self, name, override=_UNSET):
         if override is not _UNSET:
             return override
-        return self.confvalues.get(name, self.DEFAULTS[name])
+        if isinstance(name, basestring):
+            value = self.confvalues.get(name, _UNSET)
+            if value is _UNSET:
+                value = self.DEFAULTS[name]
+            return value
+        intermediate = self.confvalues
+        for item in name:
+            intermediate = intermediate[item]
+        return intermediate
