@@ -38,10 +38,10 @@ class PayrollTweaker(PdfTweaker):
             # Perhaps here, add a try/except ParseError and ignore buggy page
             ancode, name = self._getinfo(filename, pagenb)
             self.alldata.append((name, ancode))
-            if pagenb + 1 >= self.pages_to_process:
+            if self.restrict and pagenb + 1 >= self.restrict:
                 self.logger.info(
                     "Stopping the parsing as requested by limit of %d pages",
-                    self.pages_to_process
+                    self.restrict
                     )
                 return True
         return True

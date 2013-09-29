@@ -30,7 +30,7 @@ class PdfTweaker(object):
         self.month = month
         self.last_print_page = 0
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
-        self.pages_to_process = self.config.getvalue('restrict')
+        self.pages_to_process = self.restrict = self.config.getvalue('restrict')
 
         # list of all pages, ready for printing/parsing etc.
         self.allpages = []
@@ -93,10 +93,10 @@ class PdfTweaker(object):
             yield (cur_index,) + printdata
             cur_index = next_index
             next_index += 1
-            if cur_index >= self.pages_to_process:
+            if self.restrict and cur_index >= self.restrict:
                 self.logger.info(
                     "Stopping the parsing as requested by limit of %d pages",
-                    self.pages_to_process
+                    self.restrict
                     )
                 return
 
