@@ -22,28 +22,29 @@ class PayrollTweaker(PdfTweaker):
     _ANCODE_MARKER = re.compile('^ANCODE ')
     _NAME_MARKER = re.compile('^NAME ')
 
+    def __init__(self, *args):
+        PdfTweaker.__init__(self, *args)
+        self.preprocessor = self.config.getvalue('payroll_preprocessor')
+
     def addpages(self, output, pagenb):
         page = self.allpages[pagenb]
         output.addPage(page)
+        self.last_print_page += 1
         return 1
 
-    def getdata(self, pages_nb, filename):
-        self.alldata = []
+    def getdata(self, reader, filename, pages_nb):
 
         for pagenb in xrange(pages_nb):
             # Perhaps here, add a try/except ParseError and ignore buggy page
             ancode, name = self._getinfo(filename, pagenb)
             self.alldata.append((name, ancode))
+            if pagenb + 1 >= self.pages_to_process:
+                self.logger.info(
+                    "Stopping the parsing as requested by limit of %d pages",
+                    self.pages_to_process
+                    )
+                return True
         return True
-
-    def split_stream(self, filename, reader, pages_nb):
-        self.register_pages(reader, pages_nb)
-        self.preprocessor = self.config.getvalue('payroll_preprocessor')
-
-        self.getdata(pages_nb, filename)
-
-        for pagenb in xrange(pages_nb):
-            self.printpages(pagenb)
 
     def _getinfo(self, filename, pagenb):
 
@@ -75,9 +76,8 @@ class SituationTweaker(PdfTweaker):
     _DOCTYPE = 'tresorerie'
     _UNITARY_TIME = 0.1
 
-    def getdata(self, reader):
+    def getdata(self, reader, filename, pages_nb):
         outlines = reader.getOutlines()
-        self.alldata = []
 
         self.logger.info("Parsing outlines. Output below")
         for entrepreneur, ancode in self.browse(outlines):
@@ -89,27 +89,18 @@ class SituationTweaker(PdfTweaker):
         self.logger.critical("could not parse outlines?!")
         return False
 
-    def split_stream(self, filename, reader, pages_nb):
-        self.register_pages(reader, pages_nb)
-        if not self.getdata(reader):
-            return
+    def getprintdata(self, next_index):
+        print_all_remaining = False
+        if next_index < len(self.alldata):
+            next_entr, next_ancode = self.alldata[next_index]
+            # may be None here also:
+            next_startpage = self.findpage(next_ancode)
+        else:
+            next_startpage = None
 
-        cur_index = 0
-        next_index = 1
-        while self.last_print_page < pages_nb:
-            print_all_remaining = False
-            if next_index < len(self.alldata):
-                next_entr, next_ancode = self.alldata[next_index]
-                # may be None here also:
-                next_startpage = self.findpage(next_ancode)
-            else:
-                next_startpage = None
-
-            if next_startpage is None:
-                print_all_remaining = True
-            self.printpages(cur_index, print_all_remaining, next_startpage)
-            cur_index = next_index
-            next_index += 1
+        if next_startpage is None:
+            print_all_remaining = True
+        return print_all_remaining, next_startpage
 
     def findpage(self, ancode):
         for index, page in enumerate(self.allpages[self.last_print_page:]):

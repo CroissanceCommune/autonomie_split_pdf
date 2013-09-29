@@ -32,8 +32,15 @@ class PdfTweaker(object):
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
         self.pages_to_process = self.config.getvalue('restrict')
 
+        # list of all pages, ready for printing/parsing etc.
+        self.allpages = []
+
+        # list of (name, ancode)
+        self.alldata = []
+
     def tweak(self, pdfstream):
         mkdir_p(self.output_dir, self.logger)
+        filename = pdfstream.name
         with open(pdfstream.name, 'rb') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
 
@@ -42,7 +49,7 @@ class PdfTweaker(object):
                 # 0 means no restriction
                 self.pages_to_process = pages_nb
 
-            self.logger.info("%s has %d pages", pdfstream.name, pages_nb)
+            self.logger.info("%s has %d pages", filename, pages_nb)
             self.logger.info(
                 "Estimated time for completion of %d pages on "
                 "an average computer: %.f seconds. Please stand while "
@@ -52,17 +59,46 @@ class PdfTweaker(object):
                 )
             start = time.clock()
 
-            self.split_stream(pdfstream.name, inputpdf, pages_nb)
+            self.register_pages(inputpdf, pages_nb)
+            if not self.getdata(inputpdf, filename, pages_nb):
+                self.logger.critical("No data could be extracted! "
+                "Not splitting, sorry")
+                return
+
+            for printinfo in self.split_stream(pages_nb):
+                self.printpages(*printinfo)
 
             duration = time.clock() - start
             self.logger.info("Total duration: %s seconds, thank you for your patience",
                 duration)
 
     def register_pages(self, reader, pages_nb):
-        self.allpages = []
         for index in xrange(pages_nb):
             current_page = reader.getPage(index)
             self.allpages.append(current_page)
+
+    def getprintdata(self, next_index):
+        """
+        supplies data for addpages()
+
+        default implementation returns empty tuple."""
+        return ()
+
+    def split_stream(self, pages_nb):
+        cur_index = 0
+        next_index = 1
+        # last_print_page is updated by addpages()
+        while self.last_print_page < pages_nb:
+            printdata = self.getprintdata(next_index)
+            yield (cur_index,) + printdata
+            cur_index = next_index
+            next_index += 1
+            if cur_index >= self.pages_to_process:
+                self.logger.info(
+                    "Stopping the parsing as requested by limit of %d pages",
+                    self.pages_to_process
+                    )
+                return
 
     def printpages(self, pagenb, *args):
         """
