@@ -1,13 +1,16 @@
+from collections import Iterable
+from subprocess import Popen, PIPE
 import os.path
+import re
 import time
 import unicodedata
-import re
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
+from PyPDF2.pdf import Destination
 
+from .config import Config
 from .file_operations import mkdir_p
 from .log_config import mk_logger
-from .config import Config
 
 
 _UNIX_VALID = re.compile('[^\w\s-]')
@@ -37,6 +40,26 @@ class PdfTweaker(object):
 
         # list of (name, ancode)
         self.alldata = []
+
+    def make_process(self, argv_seq):
+        try:
+            process = Popen(argv_seq, stdout=PIPE, stderr=PIPE)
+        except OSError:
+            self.logger.critical(
+                    "Error while trying to run '%s'",
+                    ' '.join(argv_seq))
+            raise
+        return process
+
+    def get_command_outputs(self, argv_seq):
+        """
+        :return: stdout and stderr as unicode decodable strings, return code as
+        int
+        """
+        process = self.make_process(argv_seq)
+        stdout, stderr = process.communicate()
+        returncode = process.returncode
+        return stdout, stderr, returncode
 
     def tweak(self, pdfstream):
         mkdir_p(self.output_dir, self.logger)
@@ -69,8 +92,10 @@ class PdfTweaker(object):
                 self.printpages(*printinfo)
 
             duration = time.clock() - start
-            self.logger.info("Total duration: %s seconds, thank you for your patience",
-                duration)
+            self.logger.info(
+                    "Total processor time: %s seconds, "
+                    "thank you for your patience",
+                    duration)
 
     def register_pages(self, reader, pages_nb):
         for index in xrange(pages_nb):
@@ -116,3 +141,115 @@ class PdfTweaker(object):
     def get_outfname(self, ancode, entrepreneur):
         outfname = '%s_%s' % (ancode, entrepreneur)
         return "%s/%s.pdf" % (self.output_dir, unix_sanitize(outfname))
+
+
+class OutlineTweaker(PdfTweaker):
+
+    def getdata(self, reader, filename, pages_nb):
+        outlines = reader.getOutlines()
+
+        self.logger.info("Parsing outlines. Output below")
+        for entrepreneur, ancode in self.browse(outlines):
+            self.alldata.append((entrepreneur, ancode))
+
+        if self.alldata:
+            return True
+
+        self.logger.critical("could not parse outlines?!")
+        return False
+
+    def getprintdata(self, next_index):
+        print_all_remaining = False
+        if next_index < len(self.alldata):
+            next_entr, next_ancode = self.alldata[next_index]
+            # may be None here also:
+            next_startpage = self.findpage(next_ancode)
+        else:
+            next_startpage = None
+
+        if next_startpage is None:
+            print_all_remaining = True
+        return print_all_remaining, next_startpage
+
+    def findpage(self, ancode):
+        for index, page in enumerate(self.allpages[self.last_print_page:]):
+            text = page.extractText()
+            if ancode in text:
+                return self.allpages.index(page)
+            pages_to_browse = 10
+            if index > pages_to_browse:
+                self.logger.info(
+                    "Browsed %d pages without finding code %s,"
+                    "search aborted", pages_to_browse, ancode)
+                return None
+        return None
+
+    def addpages(self, output, current_page, print_all_remaining, next_startpage):
+        """
+        :arg bool print_all_remaining: should we print all the remainder (stop
+        splitting)
+        :arg int next_startpage: page until which we print
+
+        I think there is a bug in the content of alldata, but it seems to work
+        """
+
+        if print_all_remaining:
+            for index, page in enumerate(self.allpages[self.last_print_page:]):
+                output.addPage(page)
+                self.last_print_page += 1
+            return index + 1
+
+        if self.last_print_page == next_startpage:
+            self.logger.warning(
+                "2 analytic codes on page %d (%s and %s)",
+                self.last_print_page, *[
+                    self.alldata[pnum][1] for pnum in (self.last_print_page,
+                    self.last_print_page + 1)
+                    ]
+                )
+            output.addPage(self.allpages[self.last_print_page])
+            return 1
+
+        for page in self.allpages[self.last_print_page:next_startpage]:
+            output.addPage(page)
+            self.last_print_page += 1
+        return next_startpage - self.last_print_page + 1
+
+    def browse(
+            self,
+            outline,
+            level=0,
+            maintitle='',
+            entrepreneur=''
+            ):
+        """
+        Recurses through outlines, yielding only when we have anaytic codes
+
+        Yields tuple: entrepreneur, analytic code
+        """
+        for destination in outline:
+            if isinstance(destination, Destination):
+                title = destination.title
+                if level == 2:
+                    yield entrepreneur, title
+                    continue
+                if level == 0:
+                    maintitle = title
+                elif level == 1:
+                    entrepreneur = title
+                self.logger.info("%s- %s", '|'*(level + 1), title)
+            else:
+                if isinstance(destination, Iterable):
+                    for item in self.browse(
+                            destination,
+                            level + 1,
+                            maintitle,
+                            entrepreneur
+                            ):
+                        yield item
+                else:
+                    self.logger.warning(
+                        "Skipping entry of type %s" %
+                        type(destination)
+                        )
+

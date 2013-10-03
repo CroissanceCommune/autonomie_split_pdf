@@ -1,5 +1,7 @@
-import logging
+import datetime
 from logging import handlers
+import logging
+import os
 import socket
 import traceback
 
@@ -46,11 +48,14 @@ def log_exception(logger):
 
 
 _MAIL_TEMPLATE = u"""
-Following are all messages logged by the PDF splitter for
-autonomie on this run:
+PDF Splitter for Autonomie.
 
+PID: %(process)s
+Time: %(date)s
 
-%s
+Following are all messages logged by the process on this run.
+
+%%s
 """
 
 
@@ -65,11 +70,11 @@ def mk_logger(name):
         _INITIALIZED = True
     logger = logging.getLogger(name)
     log_level = config.getvalue('loglevel')
-    logger.setLevel(log_level, log_level)
+    logger.setLevel(log_level)
     if config.getvalue('use_syslog'):
         _config_syslog(logger, log_level)
     if config.getvalue('log_to_mail'):
-        _config_maillog(logger, config)
+        _config_maillog(logger, log_level, config)
     return logger
 
 
@@ -91,7 +96,11 @@ def _config_maillog(logger, log_level, config):
         mail_subject = config.getvalue(('mail', 'subject')) % {
             'hostname': socket.gethostname(),
         }
-        mail_template = _MAIL_TEMPLATE
+        now = datetime.datetime.now()
+        mail_template = _MAIL_TEMPLATE % {
+            'process': os.getpid(),
+            'date': now.strftime("%Y %B %d - %H:%M:%S")
+        }
         _MAILLOG_HANDLER = SummarisingLogger(
             config.getvalue(('mail', 'from')),
             config.getvalue(('mail', 'to')),
@@ -101,7 +110,6 @@ def _config_maillog(logger, log_level, config):
             template=mail_template,
         )
         _MAILLOG_HANDLER.setFormatter(
-            logging.Formatter('[%(name)-17s %(process)s] - '
-            '%(levelname)s - %(message)s'))
+            logging.Formatter('%(levelname)-9s - %(message)s'))
         _MAILLOG_HANDLER.setLevel(log_level)
     logger.addHandler(_MAILLOG_HANDLER)
