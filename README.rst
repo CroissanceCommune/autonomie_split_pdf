@@ -39,3 +39,12 @@ How to debug
 
 When the expected data is not found, tweak dumps the current XML page in a file
 so you can read it. A good (quite sufficient) XML reader is iceweasel.
+
+Known problems
+--------------
+
+* cannot handle some PDF files, especially if there is no outline and the
+  charset is 'binary'.
+  Check this with::
+
+    file -i $filename.pdf
