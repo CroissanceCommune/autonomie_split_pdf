@@ -163,7 +163,20 @@ class OutlineTweaker(PdfTweaker):
         if next_index < len(self.alldata):
             next_entr, next_ancode = self.alldata[next_index]
             # may be None here also:
-            next_startpage = self.findpage(next_ancode)
+            next_startpage = self.findpage((next_ancode,))
+            if next_startpage is None:
+                self.logger.info(
+                    "Attempt to rescue: " "was an analytic code ommitted?"
+                    )
+                rescue_range = next_index + 1, next_index + 10
+                rescue_ancodes = [
+                    data[1] 
+                    for data in self.alldata[rescue_range[0]:rescue_range[1]]
+                    ]
+                self.logger.info("Trying analytic codes %s", rescue_ancodes)
+                next_startpage = self.findpage(rescue_ancodes)
+                # may still be None!
+                    
         else:
             next_startpage = None
 
@@ -171,16 +184,17 @@ class OutlineTweaker(PdfTweaker):
             print_all_remaining = True
         return print_all_remaining, next_startpage
 
-    def findpage(self, ancode):
+    def findpage(self, ancodes):
         for index, page in enumerate(self.allpages[self.last_print_page:]):
             text = page.extractText()
-            if ancode in text:
-                return self.allpages.index(page)
+            for ancode in ancodes:
+                if ancode in text:
+                    return self.allpages.index(page)
             pages_to_browse = 10
             if index > pages_to_browse:
                 self.logger.info(
                     "Browsed %d pages without finding code %s,"
-                    "search aborted", pages_to_browse, ancode)
+                    "search aborted", pages_to_browse, ancodes)
                 return None
         return None
 
