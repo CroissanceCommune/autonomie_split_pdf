@@ -12,7 +12,7 @@ ANCODE_LINE=11
 ANCODE_COL=55
 NAME_COL=90
 
-SPECIFIC_CONFIG="~/payroll_rc"
+SPECIFIC_CONFIG="$HOME/payroll_rc"
 
 if [ -f ${SPECIFIC_CONFIG} ]
     then
