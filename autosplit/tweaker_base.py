@@ -34,6 +34,8 @@ class PdfTweaker(object):
         self.last_print_page = 0
         self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
         self.pages_to_process = self.restrict = self.config.getvalue('restrict')
+        self.offset = -1 # -1 stands for uninitialized.
+        self.section_pages = []
 
         # list of all pages, ready for printing/parsing etc.
         self.allpages = []
@@ -113,14 +115,16 @@ class PdfTweaker(object):
         cur_index = 0
         next_index = 1
         # last_print_page is updated by addpages()
-        while self.last_print_page < pages_nb:
+        outputs_nb = len(self.alldata)
+        for iteration in xrange(outputs_nb):
             printdata = self.getprintdata(next_index)
             yield (cur_index,) + printdata
             cur_index = next_index
             next_index += 1
-            if self.restrict and cur_index >= self.restrict:
+            if self.restrict and self.last_print_page >= self.restrict:
                 self.logger.info(
-                    "Stopping the parsing as requested by limit of %d pages",
+                    "Stopping the parsing as requested by limit of %d pages"
+                    " or next section beginning",
                     self.restrict
                     )
                 return
@@ -132,10 +136,15 @@ class PdfTweaker(object):
         """
         output = PdfFileWriter()
         nb_print_pages = self.addpages(output, pagenb, *args)
+        if pagenb >= len(self.alldata):
+            return
         name, ancode = self.alldata[pagenb]
         outfname = self.get_outfname(ancode, name)
         with open(outfname, 'w') as wfd:
-            self.logger.info("%d page(s) -> %s", nb_print_pages, outfname)
+            self.logger.info(
+                "%d page(s) -> %s",
+                nb_print_pages,
+                outfname)
             output.write(wfd)
 
     def get_outfname(self, ancode, entrepreneur):
@@ -149,8 +158,31 @@ class OutlineTweaker(PdfTweaker):
         outlines = reader.getOutlines()
 
         self.logger.info("Parsing outlines. Output below")
-        for entrepreneur, ancode in self.browse(outlines):
+        section_pages = []
+        for index, (level, data) in enumerate(self.browse(outlines)):
+            if level == 0:
+                destination = data
+                section_pages.append(destination.page.idnum)
+                continue
+            elif level != 2:
+                continue
+            entrepreneur, ancode, page = data
+            if self.offset == -1:
+                # assumes there is no header
+                self.offset = page.idnum
+                self.logger.info("Page offset seems to be %i", self.offset)
             self.alldata.append((entrepreneur, ancode))
+
+        if self.offset == -1:
+            offset = 0
+        else:
+            offset = self.offset
+
+        # beware, we speak of 0 indexed pages
+        self.section_pages = [value - offset for value in section_pages]
+
+        # perhaps this is buggy but should always work with sage
+        self.logger.info("Sections pages seem to be: %s", self.section_pages)
 
         if self.alldata:
             return True
@@ -158,8 +190,30 @@ class OutlineTweaker(PdfTweaker):
         self.logger.critical("could not parse outlines?!")
         return False
 
+    def get_section_boundaries(self):
+        assert self.section_pages
+        for index, startpageno in enumerate(self.section_pages):
+            if startpageno >= self.last_print_page:
+                try:
+                    start = self.section_pages[index - 1]
+                except IndexError:
+                    start = 0
+                finally:
+                    break
+        else:
+            assert False, "Current 'last_print_page' is %i and section_pagenos: %s" %(
+                self.last_print_page,
+                self.section_pages
+            )
+
+        return start, startpageno
+
     def getprintdata(self, next_index):
         print_all_remaining = False
+        section_start, section_end = self.get_section_boundaries()
+        if self.restrict > section_end + 1:
+            self.restrict = section_end + 1 # suboptimal: should be set ONCE
+            # +1 is conservative
         if next_index < len(self.alldata):
             next_entr, next_ancode = self.alldata[next_index]
             # may be None here also:
@@ -170,18 +224,20 @@ class OutlineTweaker(PdfTweaker):
                     )
                 rescue_range = next_index + 1, next_index + 10
                 rescue_ancodes = [
-                    data[1] 
+                    data[1]
                     for data in self.alldata[rescue_range[0]:rescue_range[1]]
                     ]
                 self.logger.info("Trying analytic codes %s", rescue_ancodes)
                 next_startpage = self.findpage(rescue_ancodes)
                 # may still be None!
-                    
+
         else:
-            next_startpage = None
+            next_startpage = section_end
+            print_all_remaining = True
 
         if next_startpage is None:
             print_all_remaining = True
+
         return print_all_remaining, next_startpage
 
     def findpage(self, ancodes):
@@ -208,7 +264,9 @@ class OutlineTweaker(PdfTweaker):
         """
 
         if print_all_remaining:
-            for index, page in enumerate(self.allpages[self.last_print_page:]):
+            index = 0 # may be undefined this is a fallback value- fixme
+            for index, page in enumerate(
+                self.allpages[self.last_print_page:self.restrict]):
                 output.addPage(page)
                 self.last_print_page += 1
             return index + 1
@@ -243,14 +301,17 @@ class OutlineTweaker(PdfTweaker):
         """
         for destination in outline:
             if isinstance(destination, Destination):
+                page = destination.page
                 title = destination.title
                 if level == 2:
-                    yield entrepreneur, title
+                    yield level, (entrepreneur, title, page)
                     continue
                 if level == 0:
                     maintitle = title
+                    yield level, destination
                 elif level == 1:
                     entrepreneur = title
+                    yield level, destination
                 self.logger.info("%s- %s", '|'*(level + 1), title)
             else:
                 if isinstance(destination, Iterable):
