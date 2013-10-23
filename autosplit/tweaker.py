@@ -24,6 +24,7 @@ class PayrollTweaker(PdfTweaker):
         self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
 
     def addpages(self, output, pagenb):
+        self.logger.debug("addpages for %i", pagenb)
         page = self.allpages[pagenb]
         output.addPage(page)
         self.last_print_page += 1

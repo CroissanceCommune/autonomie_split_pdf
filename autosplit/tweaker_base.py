@@ -149,6 +149,7 @@ class PdfTweaker(object):
                 "Not splitting, sorry")
                 return
 
+            self.logger.debug("Now writing files")
             for iteration, printinfo in enumerate(self.split_stream(pages_nb)):
                 self.printpages(iteration, *printinfo)
 
@@ -171,7 +172,22 @@ class PdfTweaker(object):
         return ()
 
     def split_stream(self, pages_nb):
-        return iter(self.outlinedata)
+        cur_index = 0
+        next_index = 1
+        # last_print_page is updated by addpages()
+        outputs_nb = len(self.alldata)
+        for iteration in xrange(outputs_nb):
+            printdata = self.getprintdata(next_index)
+            yield (cur_index,) + printdata
+            cur_index = next_index
+            next_index += 1
+            if self.restrict and self.last_print_page >= self.restrict:
+                self.logger.info(
+                    "Stopping the parsing as requested by limit of %d pages"
+                    " or next section beginning",
+                    self.restrict
+                    )
+                return
 
     def printpages(self, iteration, pagenb, *args):
         """
@@ -198,6 +214,9 @@ class PdfTweaker(object):
 
 
 class OutlineTweaker(PdfTweaker):
+
+    def split_stream(self, pages_nb):
+        return iter(self.outlinedata)
 
 
     def getdata(self, reader, filename, pages_nb):
