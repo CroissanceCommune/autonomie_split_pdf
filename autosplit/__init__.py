@@ -12,6 +12,7 @@ __email__ = "feth@majerti.fr"
 __status__ = "Development"
 
 
+import hashlib
 import logging
 import os.path
 import re
@@ -25,6 +26,19 @@ _FILENAMESRE = re.compile(
     r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
     '[0-9]+)_(?P<MONTH>[^_]+)\.pdf'
     )
+
+
+def get_md5sum(openfile):
+    """
+    from http://www.pythoncentral.io/hashing-files-with-python/
+    """
+    BLOCKSIZE = 65536
+    hasher = hashlib.md5()
+    buf = openfile.read(BLOCKSIZE)
+    while len(buf) > 0:
+        hasher.update(buf)
+        buf = openfile.read(BLOCKSIZE)
+    return hasher.hexdigest()
 
 
 def version():
@@ -76,6 +90,7 @@ def main():
 
         #argparse has already open the files
         logger.info('Loading PDF "%s"', openfile.name)
+        logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
         try:
             tweaker.tweak(openfile)
         except BaseException:
