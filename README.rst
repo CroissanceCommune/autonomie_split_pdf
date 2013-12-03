@@ -63,7 +63,7 @@ For payroll handling, an additional file is needed::
 
 This file is bash sourced and contains some info about the payroll layout.
 
-Example::
+Example:
 
     .. code:: shell
 
