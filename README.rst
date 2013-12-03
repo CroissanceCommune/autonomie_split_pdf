@@ -1,3 +1,8 @@
+Licence
+--------
+
+This is a free software (GPLv3), see LICENCE.txt for licencing info.
+
 local installation
 ------------------
 
