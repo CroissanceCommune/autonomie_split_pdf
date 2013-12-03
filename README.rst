@@ -91,4 +91,28 @@ Known problems
 
         file -i $filename.pdf
 
-* for situation and result, we need an outline in the PDF file.
+* for situation and result
+    We need an outline in the PDF file.
+    This outline must follow the following hierarchy:
+
+        * title of level 1
+
+          * entrepreneur name
+
+            * analytic code
+            * [optional analytic code]
+
+          * entrepreneur name
+
+            * analytic code
+            * [optional analytic code]
+
+          * entrepreneur name
+
+            * analytic code
+            * [optional analytic code]
+
+          ...
+
+        * optional title level 1
+
