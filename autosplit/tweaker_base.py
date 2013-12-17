@@ -329,6 +329,8 @@ class OutlineTweaker(PdfTweaker):
     def addpages(self, output, startpage, pages_nb, ancode, entrepreneur, reader):
         for pageno in xrange(pages_nb):
             self.last_print_page = startpage + pageno
+            assert startpage >= 0, "Start page = %s" % startpage
+            assert pageno >= 0, "Page no = %s" % pageno
             page = reader.getPage(self.last_print_page)
             output.addPage(page)
         self.logger.debug("addpages: %-7s %s", ancode, entrepreneur)
