@@ -28,6 +28,7 @@ Concrete implementations of tweakers that split pdf files
 
 import os
 import re
+from tempfile import mkstemp
 
 from .tweaker_base import PdfTweaker, OutlineTweaker
 from . import config
@@ -88,13 +89,21 @@ class PayrollTweaker(PdfTweaker):
         # software and PyPDF2 API use 0 - index.
         pdftotext_pagenb = pagenb + 1
 
-        stdout, stderr, returncode = self.get_command_outputs([
+        command = [
             self.preprocessor,
             filename, '%d' % pdftotext_pagenb,
-            ])
+            ]
+        stdout, stderr, returncode = self.get_command_outputs(command)
+        strcommand = " ".join(command)
         if returncode != 0:
-            raise ParseError("Return code of command: %d", returncode)
+            raise ParseError("Return code of command '%s': %d", (strcommand, returncode))
         stdout = stdout.decode('utf-8')
+        if "Error (" in stdout:
+            fdesc, temppath = mkstemp(prefix="txt_split_error-")
+            with open(temppath, 'w') as tempfd:
+                tempfd.write(stdout)
+            raise ParseError("pdf splitting failed - txt file dumped as %s - command was '%s' " 
+                % (temppath, strcommand))
         stdout_lines = stdout.split('\n')
         ancode = self.parse_single_value(stdout_lines[0], self._ANCODE_MARKER)
         name = self.parse_single_value(stdout_lines[1], self._NAME_MARKER)
@@ -107,7 +116,7 @@ class PayrollTweaker(PdfTweaker):
 
     def parse_single_value(self, value, marker_re):
         if not marker_re.match(value):
-            raise ParseError("Didn't find expected output marker")
+            raise ParseError("Didn't find expected output marker: '%s' in '%s'" % (marker_re.pattern, value))
         return marker_re.sub('', value)
 
 
