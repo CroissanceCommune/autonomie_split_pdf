@@ -22,7 +22,7 @@ if [ -f ${SPECIFIC_CONFIG} ]
     . ${SPECIFIC_CONFIG}
 fi
 
-pdftotext -layout -f $PAGE -l $PAGE "${FILE}" $outfile 2>&1 > /dev/null
+pdftotext -q -layout -f $PAGE -l $PAGE "${FILE}" $outfile
 
 ANCODE=`awk "NR==${ANCODE_LINE} {print;}" $outfile |cut -c ${ANCODE_COL}- |sed -e 's/^ \+//' -e 's/ .*//'`
 echo "ANCODE $ANCODE"
