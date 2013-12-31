@@ -22,6 +22,7 @@
 # along with Autonomie. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 from copy import deepcopy
 import logging
 import os.path as ospath
@@ -35,6 +36,9 @@ DEFAULT_CONFIGFILE = ospath.join(
 
 _UNSET = object()
 
+class Error(Exception):
+    def __init__(self, message):
+        self.message = message
 
 class Config(object):
     DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,

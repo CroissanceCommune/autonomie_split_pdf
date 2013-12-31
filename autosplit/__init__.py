@@ -40,7 +40,7 @@ import logging
 import os.path
 import re
 
-from .config import Config, DEFAULT_CONFIGFILE
+from .config import Config, DEFAULT_CONFIGFILE, Error as ConfigError
 from .log_config import log_exception, mk_logger
 from .tweaker import DOC_TWEAKERS
 
@@ -109,11 +109,17 @@ def main():
         doctype = parsed.group('DOCTYPE')
         year =  parsed.group('YEAR')
         month =  parsed.group('MONTH')
-        tweaker = DOC_TWEAKERS[doctype](year, month)
+        try:
+            tweaker = DOC_TWEAKERS[doctype](year, month)
+        except ConfigError, exception:
+            logger.critical("Error in your configuration: %s", exception.message)
+            log_exception(logger)
+            raise
 
         #argparse has already open the files
         logger.info('Loading PDF "%s"', openfile.name)
         logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
+
         try:
             tweaker.tweak(openfile)
         except BaseException:

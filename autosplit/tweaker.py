@@ -26,11 +26,11 @@
 Concrete implementations of tweakers that split pdf files
 """
 
+import os
 import re
 
-
 from .tweaker_base import PdfTweaker, OutlineTweaker
-
+from . import config
 
 class ParseError(Exception):
     pass
@@ -46,6 +46,10 @@ class PayrollTweaker(PdfTweaker):
     def __init__(self, *args):
         PdfTweaker.__init__(self, *args)
         self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
+        if not os.path.exists(self.preprocessor):
+            raise config.Error(
+                "payroll preprocessor: %s - file not found" 
+                % self.preprocessor)
 
     def addpages(self, output, pagenb):
         self.logger.debug("addpages for %i", pagenb)
