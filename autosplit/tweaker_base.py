@@ -52,6 +52,7 @@ class Section(object):
     def __init__(self, startpage, title, level):
         self.title = title
         self.startpage = startpage
+        assert self.startpage >= 0, self.startpage
         self.pages_nb = 1
         self.subsections = None
         self.following_section_startpage = 0
@@ -95,6 +96,7 @@ class Section(object):
         Only works if self.subsections is iterable (ie. not None)
         """
         if self.section_type == 'ancode':
+            assert self.startpage >= 0, self.startpage
             return self.startpage, self.pages_nb, self.title
 
         if self.section_type == 'main':
@@ -202,6 +204,7 @@ class PdfTweaker(object):
         outputs_nb = len(self.alldata)
         for iteration in xrange(outputs_nb):
             printdata = self.getprintdata(next_index)
+            self.logger.debug("printdata %s", printdata)
             yield (cur_index,) + printdata
             cur_index = next_index
             next_index += 1
@@ -253,6 +256,9 @@ class OutlineTweaker(PdfTweaker):
                 continue
             for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
                 for item in entrepreneur:
+                    assert all(value >= 0 for value in item[:2]), \
+                        "section contents: startpage:%3i - length: %i - %-7s '%s'" \
+                        % item
                     self.logger.debug("startpage:%3i - length: %i - %-7s '%s'",
                         *item)
                     self.outlinedata.append(item + (reader,))
@@ -354,9 +360,28 @@ class OutlineTweaker(PdfTweaker):
         for destination in outline:
             if isinstance(destination, Destination):
                 title = destination.title
-                # real pageno is offset
-                pageno = destination.page.idnum - self.offset
+                if level > 2:
+                    pageno = 0 # we don't care
+                elif previous_section is None:
+                    pageno = 0
+                else:
+                    pageno = previous_section.startpage + previous_section.pages_nb + 1
+#                # real pageno is offset
+#                pageno = destination.page.idnum - self.offset
+#                if pageno < 0:
+#                    self.logger.warning("Previous pageno was %d, and now we have %d",
+#                        self.offset, destination.page.idnum)
+#                    if previous_section is not None:
+#                        pageno = previous_section.pages_nb + previous_section.startpage
+#                        self.offset = pageno - destination.page.idnum
+#                        self.logger.warning("Resetting offset to %d", self.offset)
+#
+                    # So they gave us something weird:
+                    # 1st page
+                assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
+                    pageno, destination.page.idnum, self.offset)
                 if make_offset:
+                    self.logger.debug("First page.idnum: %d", pageno)
                     # only run once in the parsing
                     self.offset = pageno
                     # correcting the pageno

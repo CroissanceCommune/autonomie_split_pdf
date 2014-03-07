@@ -116,3 +116,8 @@ Known problems
 
         * optional title level 1
 
+Writing a payroll RC file
+-------------------------
+
+use pdf2txt once on the file, find the relevant lines/cols for informations,
+there you are.
