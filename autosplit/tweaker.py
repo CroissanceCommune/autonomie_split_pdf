@@ -49,7 +49,7 @@ class PayrollTweaker(PdfTweaker):
         self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
         if not os.path.exists(self.preprocessor):
             raise config.Error(
-                "payroll preprocessor: %s - file not found" 
+                "payroll preprocessor: %s - file not found"
                 % self.preprocessor)
 
     def addpages(self, output, pagenb):
@@ -102,7 +102,7 @@ class PayrollTweaker(PdfTweaker):
             fdesc, temppath = mkstemp(prefix="txt_split_error-")
             with open(temppath, 'w') as tempfd:
                 tempfd.write(stdout)
-            raise ParseError("pdf splitting failed - txt file dumped as %s - command was '%s' " 
+            raise ParseError("pdf splitting failed - txt file dumped as %s - command was '%s' "
                 % (temppath, strcommand))
         stdout_lines = stdout.split('\n')
         ancode = self.parse_single_value(stdout_lines[0], self._ANCODE_MARKER)

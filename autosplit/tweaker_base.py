@@ -23,7 +23,6 @@
 #
 
 from collections import Iterable
-import itertools
 from subprocess import Popen, PIPE
 import os.path
 import re
@@ -36,6 +35,7 @@ from PyPDF2.pdf import Destination
 from .config import Config
 from .file_operations import mkdir_p
 from .log_config import mk_logger
+from .section import Section
 
 
 _UNIX_VALID = re.compile('[^\w\s-]')
@@ -46,66 +46,6 @@ def unix_sanitize(some_name):
     value = unicodedata.normalize('NFKD', some_name).encode('ascii', 'ignore')
     value = unicode(_UNIX_VALID.sub('', value).strip())
     return _NOSPACES.sub('-', value)
-
-
-class Section(object):
-    def __init__(self, startpage, title, level):
-        self.title = title
-        self.startpage = startpage
-        assert self.startpage >= 0, self.startpage
-        self.pages_nb = 1
-        self.subsections = None
-        self.following_section_startpage = 0
-        if level == 0:
-            self.section_type = 'main'
-        elif level == 1:
-            self.section_type = 'entrepreneur'
-        elif level == 2:
-            self.section_type = 'ancode'
-        else:
-            logger = mk_logger('autosplit.section')
-            logger.critical(
-                'unexpected outline structure with more than 3 levels, '
-                'startpage: %i, title: %s, level: %i',
-                startpage,
-                title,
-                level
-                )
-
-    def compute_pagenb(self, following_section_startpage):
-        self.following_section_startpage = following_section_startpage
-        self.pages_nb = max(1, following_section_startpage - self.startpage)
-        if self.subsections:
-            self.subsections[-1].compute_pagenb(following_section_startpage)
-
-    def add_subsections(self, subsections):
-        self.subsections = subsections
-        subsections[-1].compute_pagenb(self.following_section_startpage)
-
-    def __repr__(self):
-        output = u'%3i (%s) - len %i' % (self.startpage, self.title, self.pages_nb)
-        if self.subsections:
-            output += ': ['
-            for subsection in self.subsections:
-                output += '  %s' % subsection
-            output += '] '
-        return output
-
-    def get_contents(self):
-        """
-        Only works if self.subsections is iterable (ie. not None)
-        """
-        if self.section_type == 'ancode':
-            assert self.startpage >= 0, self.startpage
-            return self.startpage, self.pages_nb, self.title
-
-        if self.section_type == 'main':
-            return itertools.chain(section.get_contents()
-                for section in self.subsections)
-
-        #entrepreneur type
-        return (section.get_contents() + (self.title,)
-            for section in self.subsections)
 
 
 class PdfTweaker(object):
@@ -245,24 +185,27 @@ class OutlineTweaker(PdfTweaker):
     def split_stream(self, pages_nb):
         return iter(self.outlinedata)
 
-
     def getdata(self, reader, filename, pages_nb):
         outlines = reader.getOutlines()
 
         self.logger.info("Parsing outlines. Output below")
         recursive_outlines = self.browse(outlines, make_offset=True)
+        self.logger.info("Browsed outlines")
         for first_level_section in recursive_outlines:
             if not first_level_section.subsections:
                 continue
             for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
                 for item in entrepreneur:
+                    self.logger.debug('%s %s', type(item), item)
                     assert all(value >= 0 for value in item[:2]), \
                         "section contents: startpage:%3i - length: %i - %-7s '%s'" \
                         % item
+
                     self.logger.debug("startpage:%3i - length: %i - %-7s '%s'",
                         *item)
                     self.outlinedata.append(item + (reader,))
                     self.alldata.append((item[3], item[2]))
+
         self.logger.info("Found %i entrepreneurs and %i analytic codes",
             entre_nb + 1, len(self.alldata))
         self.logger.info("ETA: %s s", len(self.alldata) * 0.4)
@@ -349,23 +292,25 @@ class OutlineTweaker(PdfTweaker):
         """
         pass
 
-    def browse(self, outline, level=0, make_offset=False):
+    def _destination2section(self, destination, level, previous_section,
+    make_offset):
         """
-        Offset will be calculated once, on the first outline
-
-        Todo: use last document page to specify last section length
+        :param Destination destination:
+        :param int level:
+        :param Section previous_section: None or Section
         """
-        start_ends = []
-        previous_section = None
-        for destination in outline:
-            if isinstance(destination, Destination):
-                title = destination.title
-                if level > 2:
-                    pageno = 0 # we don't care
-                elif previous_section is None:
-                    pageno = 0
-                else:
-                    pageno = previous_section.startpage + previous_section.pages_nb + 1
+        if level > 2:
+            # this is lower than ancode
+            # we don't care of pageno
+            pageno = 0
+            self.logger.warning("Unexpected TOC depth: %i", level)
+        elif previous_section is None:
+            # first section ever in this container
+            pageno = 0
+        else:
+            # this is main or entrepreneur or ancode:
+            # level 0 or 1
+            pageno = previous_section.startpage + previous_section.pages_nb + 1
 #                # real pageno is offset
 #                pageno = destination.page.idnum - self.offset
 #                if pageno < 0:
@@ -376,23 +321,37 @@ class OutlineTweaker(PdfTweaker):
 #                        self.offset = pageno - destination.page.idnum
 #                        self.logger.warning("Resetting offset to %d", self.offset)
 #
-                    # So they gave us something weird:
-                    # 1st page
-                assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
-                    pageno, destination.page.idnum, self.offset)
-                if make_offset:
-                    self.logger.debug("First page.idnum: %d", pageno)
-                    # only run once in the parsing
-                    self.offset = pageno
-                    # correcting the pageno
-                    pageno = 0
-                    # ensure we never compute this again
-                    make_offset = False
-                section = Section(pageno, title, level)
-                start_ends.append(section)
-                if previous_section is not None:
-                    previous_section.compute_pagenb(pageno)
+            # So they gave us something weird:
+            # 1st page
+        assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
+            pageno, destination.page.idnum, self.offset)
+        if make_offset:
+            self.logger.debug("First page.idnum: %d", pageno)
+            # only run once in the parsing
+            self.offset = pageno
+            # correcting the pageno
+            pageno = 0
+        section = Section(pageno, destination.title, level)
+        if previous_section is not None:
+            previous_section.compute_pagenb(pageno)
+        return section
+
+
+    def browse(self, outline, level=0, make_offset=False):
+        """
+        Offset will be calculated once, on the first outline
+
+        Todo: use last document page to specify last section length
+        """
+        start_ends = []
+        previous_section = None
+        for destination in outline:
+            if isinstance(destination, Destination):
+                section = self._destination2section(
+                    destination, level, previous_section, make_offset
+                    )
                 previous_section = section
+                start_ends.append(section)
             elif isinstance(destination, Iterable):
                 lower_level_sections = self.browse(destination, level + 1)
                 previous_section.add_subsections(lower_level_sections)
@@ -401,6 +360,6 @@ class OutlineTweaker(PdfTweaker):
                     "Unexpected type for a destination: %s",
                     type(destination)
                     )
+            # ensure we never compute offset more than at first run
+            make_offset = False
         return start_ends
-
-
