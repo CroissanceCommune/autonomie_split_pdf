@@ -189,14 +189,14 @@ class OutlineTweaker(PdfTweaker):
         outlines = reader.getOutlines()
 
         self.logger.info("Parsing outlines. Output below")
-        recursive_outlines = self.browse(outlines, make_offset=True)
+        recursive_outlines = self.browse(outlines)
         self.logger.info("Browsed outlines")
+
         for first_level_section in recursive_outlines:
             if not first_level_section.subsections:
                 continue
             for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
                 for item in entrepreneur:
-                    self.logger.debug('%s %s', type(item), item)
                     assert all(value >= 0 for value in item[:2]), \
                         "section contents: startpage:%3i - length: %i - %-7s '%s'" \
                         % item
@@ -292,74 +292,60 @@ class OutlineTweaker(PdfTweaker):
         """
         pass
 
-    def _destination2section(self, destination, level, previous_section,
-    make_offset):
+    def _destination2section(self, destination, level, previous_section):
         """
         :param Destination destination:
         :param int level:
         :param Section previous_section: None or Section
         """
-        if level > 2:
-            # this is lower than ancode
-            # we don't care of pageno
-            pageno = 0
-            self.logger.warning("Unexpected TOC depth: %i", level)
-        elif previous_section is None:
-            # first section ever in this container
-            pageno = 0
-        else:
-            # this is main or entrepreneur or ancode:
-            # level 0 or 1
-            pageno = previous_section.startpage + previous_section.pages_nb + 1
-#                # real pageno is offset
-#                pageno = destination.page.idnum - self.offset
-#                if pageno < 0:
-#                    self.logger.warning("Previous pageno was %d, and now we have %d",
-#                        self.offset, destination.page.idnum)
-#                    if previous_section is not None:
-#                        pageno = previous_section.pages_nb + previous_section.startpage
-#                        self.offset = pageno - destination.page.idnum
-#                        self.logger.warning("Resetting offset to %d", self.offset)
-#
-            # So they gave us something weird:
-            # 1st page
+        section = Section(destination, level, previous_section, self.offset)
+        pageno = section.startpage
+
+        self.logger.debug("%s idnum: %s -> page %i", destination.title, destination.page.idnum, section.startpage)
+
         assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
             pageno, destination.page.idnum, self.offset)
-        if make_offset:
-            self.logger.debug("First page.idnum: %d", pageno)
-            # only run once in the parsing
-            self.offset = pageno
-            # correcting the pageno
-            pageno = 0
-        section = Section(pageno, destination.title, level)
+
         if previous_section is not None:
-            previous_section.compute_pagenb(pageno)
+            previous_section.compute_page_info(pageno)
+
+        self.logger.debug(
+            "previous_section for %s: %s",
+            section,
+            previous_section
+            )
+
         return section
 
 
-    def browse(self, outline, level=0, make_offset=False):
+    def browse(self, outline, level=0, previous_section=None):
         """
         Offset will be calculated once, on the first outline
 
         Todo: use last document page to specify last section length
         """
         start_ends = []
-        previous_section = None
         for destination in outline:
             if isinstance(destination, Destination):
-                section = self._destination2section(
-                    destination, level, previous_section, make_offset
-                    )
+                if previous_section is None:
+                    # happens only once in the parsing
+                    # set offset
+                    self.offset = destination.page.idnum
+                    self.logger.debug("Page numbers are offset by %i", self.offset)
+                section = self._destination2section(destination, level, previous_section)
                 previous_section = section
                 start_ends.append(section)
+                self.logger.debug("Read section: %s", section)
             elif isinstance(destination, Iterable):
-                lower_level_sections = self.browse(destination, level + 1)
+                self.logger.debug("Read section container (parent=%s)", previous_section)
+                lower_level_sections = self.browse(
+                    destination, level + 1,
+                    previous_section=previous_section,
+                    )
                 previous_section.add_subsections(lower_level_sections)
             else:
                 self.logger.critical(
                     "Unexpected type for a destination: %s",
                     type(destination)
                     )
-            # ensure we never compute offset more than at first run
-            make_offset = False
         return start_ends
