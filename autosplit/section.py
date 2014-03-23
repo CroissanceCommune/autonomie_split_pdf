@@ -43,23 +43,8 @@ class Section(object):
         self.following_section_startpage = 0
         self.page_nb_definitive = False
 
-    def _is_sublevel(self, other):
-        """
-        Whether this is one level lower than other section
-
-        :param Section other:
-        :return: bool
-        """
-        if (self.section_type == _ENTREPRENEUR) \
-            and (other.section_type == _MAIN):
-            return True
-        return (self.section_type == _ANCODE) \
-            and (other.section_type == _ENTREPRENEUR)
-
     def compute_page_info(self, following_section_startpage):
         self.following_section_startpage = following_section_startpage
-        _LOGGER.debug("startpage: %i, following_section_startpage: %i",
-        self.startpage, following_section_startpage)
         self.pages_nb = max(1, following_section_startpage - self.startpage)
         if self.subsections:
             self.subsections[-1].compute_page_info(following_section_startpage)

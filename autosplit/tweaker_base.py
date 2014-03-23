@@ -163,9 +163,6 @@ class PdfTweaker(object):
         """
         output = PdfFileWriter()
         nb_print_pages = self.addpages(output, pagenb, *args)
-        if pagenb >= len(self.alldata):
-            self.logger.error("printpages() Returning early !")
-            return
         name, ancode = self.alldata[iteration]
         outfname = self.get_outfname(ancode, name)
         with open(outfname, 'w') as wfd:
@@ -301,19 +298,11 @@ class OutlineTweaker(PdfTweaker):
         section = Section(destination, level, previous_section, self.offset)
         pageno = section.startpage
 
-        self.logger.debug("%s idnum: %s -> page %i", destination.title, destination.page.idnum, section.startpage)
-
         assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
             pageno, destination.page.idnum, self.offset)
 
         if previous_section is not None:
             previous_section.compute_page_info(pageno)
-
-        self.logger.debug(
-            "previous_section for %s: %s",
-            section,
-            previous_section
-            )
 
         return section
 
@@ -323,6 +312,11 @@ class OutlineTweaker(PdfTweaker):
         Offset will be calculated once, on the first outline
 
         Todo: use last document page to specify last section length
+
+        :param outline: browseable PyPDF2 document outline
+        :param int level: how deep we are in recursion
+        :param Section previous_section: this recursive function tells itself
+        the last built section
         """
         start_ends = []
         for destination in outline:
@@ -335,9 +329,9 @@ class OutlineTweaker(PdfTweaker):
                 section = self._destination2section(destination, level, previous_section)
                 previous_section = section
                 start_ends.append(section)
-                self.logger.debug("Read section: %s", section)
+                self.logger.debug("Done reading section: %s", section)
             elif isinstance(destination, Iterable):
-                self.logger.debug("Read section container (parent=%s)", previous_section)
+                self.logger.debug("Reading section container (parent=%s)", previous_section)
                 lower_level_sections = self.browse(
                     destination, level + 1,
                     previous_section=previous_section,
