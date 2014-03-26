@@ -189,6 +189,7 @@ class OutlineTweaker(PdfTweaker):
         recursive_outlines = self.browse(outlines)
         self.logger.info("Browsed outlines")
 
+        entre_nb = 0
         for first_level_section in recursive_outlines:
             if not first_level_section.subsections:
                 continue
