@@ -105,7 +105,7 @@ def main():
     #return
     for openfile in arguments.files:
         bare_filename = os.path.split(openfile.name)[-1]
-        parsed = _FILENAMESRE.match(bare_filename)
+        parsed = _FILENAMESRE.match(bare_filename, re.IGNORECASE)
         doctype = parsed.group('DOCTYPE')
         year =  parsed.group('YEAR')
         month =  parsed.group('MONTH')
