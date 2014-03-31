@@ -109,16 +109,16 @@ def main():
         doctype = parsed.group('DOCTYPE')
         year =  parsed.group('YEAR')
         month =  parsed.group('MONTH')
+        #argparse has already open the files
+        logger.info('Loading PDF "%s"', openfile.name)
+        logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
+
         try:
             tweaker = DOC_TWEAKERS[doctype](year, month)
         except ConfigError, exception:
             logger.critical("Error in your configuration: %s", exception.message)
             log_exception(logger)
             raise
-
-        #argparse has already open the files
-        logger.info('Loading PDF "%s"', openfile.name)
-        logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
 
         try:
             tweaker.tweak(openfile)
