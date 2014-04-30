@@ -41,7 +41,7 @@ import os.path
 import re
 
 from .config import Config, DEFAULT_CONFIGFILE, Error as ConfigError
-from .log_config import log_exception, mk_logger
+from .log_config import log_exception, mk_logger, flag_report
 from .tweaker import DOC_TWEAKERS
 
 
@@ -75,18 +75,27 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Sage files parsing')
-    parser.add_argument('files', type=argparse.FileType('r'),
-        help='pdf filename named DOCTYPE_YEAR_MONTH.pdf', nargs='+')
-    parser.add_argument('-c', '--configfile', help='configuration file, '
-    'defaults to %s' % DEFAULT_CONFIGFILE,
-            default=None, type=argparse.FileType('r'))
+    parser.add_argument(
+        'files',
+        type=argparse.FileType('r'),
+        help='pdf filename named DOCTYPE_YEAR_MONTH.pdf',
+        nargs='+'
+        )
+    parser.add_argument(
+        '-c', '--configfile',
+        help='configuration file, defaults to %s' % DEFAULT_CONFIGFILE,
+        default=None,
+        type=argparse.FileType('r')
+        )
     parser.add_argument('-v', '--verbose', action='store_const', const=True,
                         help='verbose output', default=False)
     parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
                         type=int, default=0)
-    parser.add_argument('-V', '--version', action='version',
-                    version="%%(prog)s (pdf split for autonomie version %s)" %
-                        __version__)
+    parser.add_argument(
+        '-V', '--version',
+        action='version',
+        version="%%(prog)s (pdf split for autonomie version %s)" % __version__
+        )
 
     arguments = parser.parse_args()
 
@@ -100,38 +109,42 @@ def main():
     if limit != 0:
         logger.info("Analysis restricted to pages <= %d", limit)
 
-
-    #config.save_defaults()
-    #return
     for openfile in arguments.files:
         bare_filename = os.path.split(openfile.name)[-1]
         parsed = _FILENAMESRE.match(bare_filename, re.IGNORECASE)
         doctype = parsed.group('DOCTYPE')
-        year =  parsed.group('YEAR')
-        month =  parsed.group('MONTH')
+        year = parsed.group('YEAR')
+        month = parsed.group('MONTH')
 
-        #argparse has already open the files
+        # argparse has already open the files
         logger.info('Loading PDF "%s"', openfile.name)
         logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
 
         try:
             tweaker = DOC_TWEAKERS[doctype](year, month)
         except ConfigError, exception:
-            logger.critical("Error in your configuration: %s", exception.message)
+            logger.critical(
+                "Error in your configuration: %s", exception.message
+            )
             log_exception(logger)
             raise
         except Exception, exception:
             logger.critical("Error initializing splitter")
             log_exception(logger)
+            flag_report(False)
             raise
 
         try:
             tweaker.tweak(openfile)
         except BaseException:
-            logger.exception("Exception not handled by the splitter, that's a "
-            "bug, sorry.")
+            logger.exception(
+                "Exception not handled by the splitter, that's a bug, sorry."
+                )
             log_exception(logger)
+            flag_report(False)
             raise
+        else:
+            flag_report(True)
         finally:
             logging.shutdown()
 
