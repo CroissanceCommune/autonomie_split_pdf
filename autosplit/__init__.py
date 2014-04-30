@@ -47,7 +47,8 @@ from .tweaker import DOC_TWEAKERS
 
 _FILENAMESRE = re.compile(
     r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
-    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf'
+    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf',
+    re.IGNORECASE
     )
 
 
@@ -111,7 +112,7 @@ def main():
 
     for openfile in arguments.files:
         bare_filename = os.path.split(openfile.name)[-1]
-        parsed = _FILENAMESRE.match(bare_filename, re.IGNORECASE)
+        parsed = _FILENAMESRE.match(bare_filename)
         doctype = parsed.group('DOCTYPE')
         year = parsed.group('YEAR')
         month = parsed.group('MONTH')
