@@ -122,18 +122,19 @@ def _config_syslog(logger, log_level):
 
 
 _UNDEFINED = object()
+_FLAGGED = _UNDEFINED
 
 
-def _get_mail_subject(config, success=_UNDEFINED):
+def _get_mail_subject(config):
     base_subject = '[{username}]{subject}'.format(
         username=getpass.getuser(),
         subject=config.getvalue(('mail', 'subject')) % {
             'hostname': socket.gethostname(),
         },
     )
-    if success is _UNDEFINED:
+    if _FLAGGED is _UNDEFINED:
         return base_subject
-    if success:
+    if _FLAGGED:
         flag = 'success'
     else:
         flag = 'failed'
@@ -164,9 +165,6 @@ def _config_maillog(logger, log_level, config):
     logger.addHandler(_MAILLOG_HANDLER)
 
 
-_FLAGGED = _UNDEFINED
-
-
 def flag_report(success):
     """
     :param bool success: whether we succeeded
@@ -182,4 +180,4 @@ def flag_report(success):
 
     _FLAGGED = success
     config = Config.getinstance()
-    _MAILLOG_HANDLER.subject = _get_mail_subject(config, success=success)
+    _MAILLOG_HANDLER.subject = _get_mail_subject(config)
