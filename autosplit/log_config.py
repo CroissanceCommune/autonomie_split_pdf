@@ -31,6 +31,7 @@ import socket
 import traceback
 
 from mailinglogger import SummarisingLogger
+from mailinglogger.common import SubjectFormatter
 
 from .config import Config
 
@@ -180,4 +181,6 @@ def flag_report(success):
 
     _FLAGGED = success
     config = Config.getinstance()
-    _MAILLOG_HANDLER.subject = _get_mail_subject(config)
+    _MAILLOG_HANDLER.mailer.subject_formatter = SubjectFormatter(
+        _get_mail_subject(config)
+        )
