@@ -130,8 +130,21 @@ class ResultTweaker(OutlineTweaker):
     _UNITARY_TIME = 0.1
 
 
-DOC_TWEAKERS = {
-    'salaire': PayrollTweaker,
-    'tresorerie': SituationTweaker,
-    'resultat': ResultTweaker
-    }
+class ResultAndSituationTweaker(OutlineTweaker):
+    _DOCTYPE = 'resultat-tresorerie'
+    _UNITARY_TIME = 0.1
+
+    def __init__(self, year, month):
+        self.result = ResultTweaker(year, month)
+        self.situation = SituationTweaker(year, month)
+
+    def tweak(self, pdfstream):
+
+        self.result.tweak(pdfstream, mainsections_count=1)
+        self.situation.tweak(pdfstream, skip_sections=1, mainsections_count=1)
+
+
+DOC_TWEAKERS = dict(
+    (klass._DOCTYPE, klass)
+    for klass in (SituationTweaker, ResultTweaker, ResultAndSituationTweaker)
+    )

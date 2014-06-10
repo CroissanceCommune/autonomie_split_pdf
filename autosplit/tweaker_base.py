@@ -88,10 +88,18 @@ class PdfTweaker(object):
         returncode = process.returncode
         return stdout, stderr, returncode
 
-    def tweak(self, pdfstream):
+    def tweak(self, pdfstream, skip_sections=0, mainsections_count=0):
+        """
+        :param int skip_sections: In order to handle several
+            documents in the same file, I introduced skip_sections:
+            this tells the parser that previous sections have been handled
+            by another parser
+        :param int mainsections_count: same purpose as above. If None:
+        goes through all sections
+        """
         mkdir_p(self.output_dir, self.logger)
         filename = pdfstream.name
-        with open(pdfstream.name, 'rb') as duplicate_pdfstream:
+        with open(filename, 'rb') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
 
             pages_nb = inputpdf.getNumPages()
@@ -110,7 +118,7 @@ class PdfTweaker(object):
             start = time.clock()
 
             self.register_pages(inputpdf, pages_nb)
-            if not self.getdata(inputpdf, filename, pages_nb):
+            if not self.getdata(inputpdf, filename, pages_nb, skip_sections, mainsections_count):
                 self.logger.critical("No data could be extracted! "
                 "Not splitting, sorry")
                 return
@@ -182,7 +190,13 @@ class OutlineTweaker(PdfTweaker):
     def split_stream(self, pages_nb):
         return iter(self.outlinedata)
 
-    def getdata(self, reader, filename, pages_nb):
+    def getdata(self, reader, filename, pages_nb,
+        skip_sections=0,
+        mainsections_count=None):
+        """
+        :param int skip_sections: see :func:`tweak`
+        :param int mainsections_count: see :func:`tweak`
+        """
         outlines = reader.getOutlines()
 
         self.logger.info("Parsing outlines. Output below")
@@ -193,6 +207,13 @@ class OutlineTweaker(PdfTweaker):
         for first_level_section in recursive_outlines:
             if not first_level_section.subsections:
                 continue
+            if skip_sections:
+                skip_sections -= 1
+                continue
+            if mainsections_count is not None:
+                mainsections_count -= 1
+                if mainsections_count < 0:
+                    return True
             for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
                 for item in entrepreneur:
                     assert all(value >= 0 for value in item[:2]), \

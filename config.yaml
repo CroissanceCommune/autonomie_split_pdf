@@ -2,7 +2,7 @@
     loglevel: 10,
     use_syslog: true,
     verbosity: DEBUG,
-    log_to_mail: true,
+    log_to_mail: false,
     payroll: {
         preprocessor: ./payrollpdf2ancode.sh,
     },
