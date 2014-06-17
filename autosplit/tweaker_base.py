@@ -88,14 +88,22 @@ class PdfTweaker(object):
         returncode = process.returncode
         return stdout, stderr, returncode
 
-    def tweak(self, pdfstream, skip_sections=0, mainsections_count=0):
+    def tweak(
+        self,
+        pdfstream,
+        skip_sections=0,
+        mainsections_count=0,
+        reverse_naming=False
+        ):
         """
         :param int skip_sections: In order to handle several
             documents in the same file, I introduced skip_sections:
             this tells the parser that previous sections have been handled
             by another parser
         :param int mainsections_count: same purpose as above. If None:
-        goes through all sections
+        :param bool reverse_naming : defaults to False.
+            for Port-Parallele - outline is reversed
+            (analytic code / entr_name)
         """
         mkdir_p(self.output_dir, self.logger)
         filename = pdfstream.name
@@ -118,20 +126,29 @@ class PdfTweaker(object):
             start = time.clock()
 
             self.register_pages(inputpdf, pages_nb)
-            if not self.getdata(inputpdf, filename, pages_nb, skip_sections, mainsections_count):
+            if not self.getdata(
+                    inputpdf,
+                    filename,
+                    pages_nb,
+                    skip_sections,
+                    mainsections_count,
+                            ):
                 self.logger.critical("No data could be extracted! "
                 "Not splitting, sorry")
                 return
 
             self.logger.debug("Now writing files")
             for iteration, printinfo in enumerate(self.split_stream(pages_nb)):
-                self.printpages(iteration, *printinfo)
+                self.printpages(iteration, *printinfo, reverse_naming=True)
 
             duration = time.clock() - start
             self.logger.info(
                     "Total processor time: %s seconds, "
                     "thank you for your patience",
                     duration)
+
+    def getdata(*args, **kwargs):
+        raise NotImplementedError()
 
     def register_pages(self, reader, pages_nb):
         for index in xrange(pages_nb):
@@ -164,16 +181,28 @@ class PdfTweaker(object):
                     )
                 return
 
-    def printpages(self, iteration, pagenb, *args):
+    def printpages(self, iteration, pagenb,
+        *args, **kwargs):
         """
         *args are passed to implementation specific addpage(), prepended by
         the PdfFileWriter and pagenb
+        :param bool reverse_naming: keyword arg
+            * False by default:
+              files are named after analytic code, then name
+            * when True, the name and analytic code were reversed in the
+              outline, so we correct that here.
+
         """
+        reverse_naming = kwargs.get('reverse_naming', False)
+
         output = PdfFileWriter()
         nb_print_pages = self.addpages(output, pagenb, *args)
         name, ancode = self.alldata[iteration]
-        outfname = self.get_outfname(ancode, name)
-        with open(outfname, 'w') as wfd:
+        if reverse_naming:
+            outfname = self.get_outfname(name, ancode)
+        else:
+            outfname = self.get_outfname(ancode, name)
+        with open(outfname, 'wb') as wfd:
             self.logger.info(
                 "%d page(s) -> %s",
                 nb_print_pages,

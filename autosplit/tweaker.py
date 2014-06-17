@@ -140,8 +140,17 @@ class ResultAndSituationTweaker(OutlineTweaker):
 
     def tweak(self, pdfstream):
 
-        self.result.tweak(pdfstream, mainsections_count=1)
-        self.situation.tweak(pdfstream, skip_sections=1, mainsections_count=1)
+        self.result.tweak(
+            pdfstream,
+            mainsections_count=1,
+            reverse_naming=True
+            )
+        self.situation.tweak(
+            pdfstream,
+            skip_sections=1,
+            mainsections_count=1,
+            reverse_naming=True
+            )
 
 
 DOC_TWEAKERS = dict(
