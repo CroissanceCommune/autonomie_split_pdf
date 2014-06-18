@@ -260,7 +260,7 @@ class OutlineTweaker(PdfTweaker):
         return True
 
     def get_section_boundaries(self):
-        assert self.section_pages
+        assert self.section_pages, "section_pages was 0 or None"
         for index, startpageno in enumerate(self.section_pages):
             if startpageno >= self.last_print_page:
                 try:
@@ -270,7 +270,9 @@ class OutlineTweaker(PdfTweaker):
                 finally:
                     break
         else:
-            assert False, "Current 'last_print_page' is %i and section_pagenos: %s" %(
+            assert False, \
+                "Current 'last_print_page' is {0} " \
+                "and section_pagenos: {1}".format(
                 self.last_print_page,
                 self.section_pages
             )
