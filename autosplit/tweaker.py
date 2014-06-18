@@ -59,7 +59,11 @@ class PayrollTweaker(PdfTweaker):
         self.last_print_page += 1
         return 1
 
-    def getdata(self, reader, filename, pages_nb):
+    def getdata(self, reader, filename, pages_nb, *args):
+        """
+        *args are ignored. Some instances of PdfTweaker implement getdata with
+        additional arguments
+        """
 
         for pagenb in xrange(pages_nb):
             # Perhaps here, add a try/except ParseError and ignore buggy page
