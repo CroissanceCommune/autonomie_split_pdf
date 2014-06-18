@@ -131,6 +131,11 @@ class ResultTweaker(OutlineTweaker):
 
 
 class ResultAndSituationTweaker(OutlineTweaker):
+    """
+    Implements interface of OutlineTweaker
+    Lazy implementation: inheritance.
+    We'd rather separate interface and implementation
+    """
     _DOCTYPE = 'resultat-tresorerie'
     _UNITARY_TIME = 0.1
 
@@ -155,5 +160,10 @@ class ResultAndSituationTweaker(OutlineTweaker):
 
 DOC_TWEAKERS = dict(
     (klass._DOCTYPE, klass)
-    for klass in (SituationTweaker, ResultTweaker, ResultAndSituationTweaker)
+    for klass in (
+        SituationTweaker,
+        ResultTweaker,
+        ResultAndSituationTweaker,
+        PayrollTweaker
+        )
     )
