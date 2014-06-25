@@ -92,7 +92,7 @@ class PdfTweaker(object):
         self,
         pdfstream,
         skip_sections=0,
-        mainsections_count=0,
+        mainsections_count=None,
         reverse_naming=False
         ):
         """
@@ -138,8 +138,14 @@ class PdfTweaker(object):
                 return
 
             self.logger.debug("Now writing files")
+
+            did_print = False
             for iteration, printinfo in enumerate(self.split_stream(pages_nb)):
                 self.printpages(iteration, *printinfo, reverse_naming=True)
+                did_print = True
+
+            if not did_print:
+                self.logger.critical("No page of output!")
 
             duration = time.clock() - start
             self.logger.info(
@@ -167,6 +173,10 @@ class PdfTweaker(object):
         next_index = 1
         # last_print_page is updated by addpages()
         outputs_nb = len(self.alldata)
+        if not outputs_nb:
+            self.logger.critical("No data collected? Strange")
+            return
+        self.logger.debug("Expected documents nb: %d", outputs_nb)
         for iteration in xrange(outputs_nb):
             printdata = self.getprintdata(next_index)
             self.logger.debug("printdata %s", printdata)
@@ -217,6 +227,8 @@ class PdfTweaker(object):
 class OutlineTweaker(PdfTweaker):
 
     def split_stream(self, pages_nb):
+        if not self.outlinedata:
+            self.logger.critical("No data collected in outline? Strange")
         return iter(self.outlinedata)
 
     def getdata(self, reader, filename, pages_nb,
@@ -227,36 +239,45 @@ class OutlineTweaker(PdfTweaker):
         :param int mainsections_count: see :func:`tweak`
         """
         outlines = reader.getOutlines()
+        logger = mk_logger('autosplit.getdata')
 
-        self.logger.info("Parsing outlines. Output below")
+        logger.info("Parsing outlines. Output below")
         recursive_outlines = self.browse(outlines)
-        self.logger.info("Browsed outlines")
+        logger.info("Browsed outlines")
+
 
         entre_nb = 0
         for first_level_section in recursive_outlines:
+            self.logger.debug("Entering a 1st level section")
             if not first_level_section.subsections:
+                logger.debug("Section is empty, skipping")
                 continue
             if skip_sections:
+                logger.debug("Skipping section as configured")
                 skip_sections -= 1
                 continue
             if mainsections_count is not None:
                 mainsections_count -= 1
                 if mainsections_count < 0:
+                    logger.debug("This was the last section.")
                     return True
             for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
+                self.logger.debug("Entering a 2nd level section")
                 for item in entrepreneur:
                     assert all(value >= 0 for value in item[:2]), \
                         "section contents: startpage:%3i - length: %i - %-7s '%s'" \
                         % item
 
-                    self.logger.debug("startpage:%3i - length: %i - %-7s '%s'",
+                    logger.debug("startpage:%3i - length: %i - %-7s '%s'",
                         *item)
                     self.outlinedata.append(item + (reader,))
                     self.alldata.append((item[3], item[2]))
+                logger.debug("End of a 2nd level section")
+            logger.debug("End of a 1st level section")
 
-        self.logger.info("Found %i entrepreneurs and %i analytic codes",
+        logger.info("Found %i entrepreneurs and %i analytic codes",
             entre_nb + 1, len(self.alldata))
-        self.logger.info("ETA: %s s", len(self.alldata) * 0.4)
+        logger.info("ETA: %s s", len(self.alldata) * 0.4)
         return True
 
     def get_section_boundaries(self):
@@ -342,24 +363,6 @@ class OutlineTweaker(PdfTweaker):
         """
         pass
 
-    def _destination2section(self, destination, level, previous_section):
-        """
-        :param Destination destination:
-        :param int level:
-        :param Section previous_section: None or Section
-        """
-        section = Section(destination, level, previous_section, self.offset)
-        pageno = section.startpage
-
-        assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
-            pageno, destination.page.idnum, self.offset)
-
-        if previous_section is not None:
-            previous_section.compute_page_info(pageno)
-
-        return section
-
-
     def browse(self, outline, level=0, previous_section=None):
         """
         Offset will be calculated once, on the first outline
@@ -379,7 +382,12 @@ class OutlineTweaker(PdfTweaker):
                     # set offset
                     self.offset = destination.page.idnum
                     self.logger.debug("Page numbers are offset by %i", self.offset)
-                section = self._destination2section(destination, level, previous_section)
+                section = _destination2section(
+                    destination,
+                    level,
+                    previous_section,
+                    self.offset
+                    )
                 previous_section = section
                 start_ends.append(section)
                 self.logger.debug("Done reading section: %s", section)
@@ -396,3 +404,20 @@ class OutlineTweaker(PdfTweaker):
                     type(destination)
                     )
         return start_ends
+
+def _destination2section(destination, level, previous_section, offset):
+    """
+    :param Destination destination:
+    :param int level:
+    :param Section previous_section: None or Section
+    """
+    section = Section(destination, level, previous_section, offset)
+    pageno = section.startpage
+
+    assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
+        pageno, destination.page.idnum, offset)
+
+    if previous_section is not None:
+        previous_section.compute_page_info(pageno)
+
+    return section
