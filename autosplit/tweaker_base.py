@@ -141,7 +141,7 @@ class PdfTweaker(object):
 
             did_print = False
             for iteration, printinfo in enumerate(self.split_stream(pages_nb)):
-                self.printpages(iteration, *printinfo, reverse_naming=True)
+                self.printpages(iteration, *printinfo, reverse_naming=reverse_naming)
                 did_print = True
 
             if not did_print:
