@@ -124,6 +124,16 @@ def _config_syslog(logger, log_level):
 
 _UNDEFINED = object()
 _FLAGGED = _UNDEFINED
+_DOCS_NB = 0
+
+
+def log_doc(logger, pagesnb, filename):
+    global _DOCS_NB
+    logger.info(
+        "%d page(s) -> %s",
+        pagesnb,
+        filename)
+    _DOCS_NB += 1
 
 
 def _get_mail_subject(config):
@@ -135,10 +145,12 @@ def _get_mail_subject(config):
     )
     if _FLAGGED is _UNDEFINED:
         return base_subject
+
     if _FLAGGED:
         flag = 'success'
-    else:
-        flag = 'failed'
+        return '[success: {documentsnb} docs]{subject}'.format(pages=_DOCS_NB, subject=base_subject)
+
+    flag = 'failed'
     return '[{flag}]{subject}'.format(flag=flag, subject=base_subject)
 
 

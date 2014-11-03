@@ -34,7 +34,7 @@ from PyPDF2.pdf import Destination
 
 from .config import Config
 from .file_operations import mkdir_p
-from .log_config import mk_logger
+from .log_config import mk_logger, log_doc
 from .section import Section
 
 
@@ -213,10 +213,7 @@ class PdfTweaker(object):
         else:
             outfname = self.get_outfname(ancode, name)
         with open(outfname, 'wb') as wfd:
-            self.logger.info(
-                "%d page(s) -> %s",
-                nb_print_pages,
-                outfname)
+            log_doc(self.logger, nb_print_pages, outfname)
             output.write(wfd)
 
     def get_outfname(self, ancode, entrepreneur):
