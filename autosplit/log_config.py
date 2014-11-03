@@ -36,11 +36,89 @@ from mailinglogger.common import SubjectFormatter
 from .config import Config
 
 
-_INITIALIZED = False
-_MAILLOG_HANDLER = _SYSLOG_HANDLER = None
 _LOGFORMAT = \
     "%(asctime)s [pid %(process)s][%(name)-20s]" \
     "[%(levelname)-8s] %(message)s"
+
+
+_UNDEFINED = object()
+_FLAGS_STRS = {
+    False: '[failed]',
+    True: '[success]',
+    _UNDEFINED: ''
+}
+
+
+class Session(object):
+    def __init__(self):
+        self.flagged = _UNDEFINED
+        self.docs_nb = 0
+        self.maillog_handler = None
+        self.syslog_handler = None
+        self.initialized = False
+
+    def get_logger(self, config, name):
+        if not self.initialized:
+            _log_init(config)
+            self.initialized = True
+        logger = logging.getLogger(name)
+        log_level = config.getvalue('loglevel')
+        logger.setLevel(log_level)
+        if config.getvalue('use_syslog'):
+            self._config_syslog(logger, log_level)
+        if config.getvalue('log_to_mail'):
+            self._config_maillog(logger, log_level, config)
+        return logger
+
+    def _config_syslog(self, logger, log_level):
+        if self.syslog_handler is None:
+            self.syslog_handler = handlers.SysLogHandler(
+                address='/dev/log',
+                facility=handlers.SysLogHandler.LOG_DAEMON
+                )
+            self.syslog_handler.setLevel(log_level)
+            self.syslog_handler.setFormatter(
+                logging.Formatter(
+                    '[%(name)-17s %(process)s] - '
+                    '%(levelname)s - %(message)s'
+                    )
+            )
+        logger.addHandler(self.syslog_handler)
+
+    def _get_mail_subject(self, config):
+        return '{flagstr}[{username}][{documentsnb} docs]{subject}'.format(
+            documentsnb=self.docs_nb,
+            flagstr=_FLAGS_STRS[self.flagged],
+            subject=config.getvalue(('mail', 'subject')) % {
+                'hostname': socket.gethostname(),
+            },
+            username=getpass.getuser(),
+        )
+
+    def _config_maillog(self, logger, log_level, config):
+        if self.maillog_handler is None:
+            mail_subject = self._get_mail_subject(config)
+            now = datetime.datetime.now()
+            mail_template = _MAIL_TEMPLATE % {
+                'process': os.getpid(),
+                'date': now.strftime("%Y %B %d - %H:%M:%S"),
+                'username': getpass.getuser(),
+            }
+            self.maillog_handler = SummarisingLogger(
+                config.getvalue(('mail', 'from')),
+                config.getvalue(('mail', 'to')),
+                mailhost=config.getvalue(('mail', 'host')),
+                subject=mail_subject,
+                send_level=logging.DEBUG,
+                template=mail_template,
+            )
+            self.maillog_handler.setFormatter(
+                logging.Formatter('%(levelname)-9s - %(message)s'))
+            self.maillog_handler.setLevel(log_level)
+        logger.addHandler(self.maillog_handler)
+
+
+_SESSION = Session()
 
 
 def _log_init(config):
@@ -91,108 +169,33 @@ def mk_logger(name):
     returns a logger with the name supplied.
     """
     config = Config.getinstance()
-    global _INITIALIZED
-    if not _INITIALIZED:
-        _log_init(config)
-        _INITIALIZED = True
-    logger = logging.getLogger(name)
-    log_level = config.getvalue('loglevel')
-    logger.setLevel(log_level)
-    if config.getvalue('use_syslog'):
-        _config_syslog(logger, log_level)
-    if config.getvalue('log_to_mail'):
-        _config_maillog(logger, log_level, config)
-    return logger
-
-
-def _config_syslog(logger, log_level):
-    global _SYSLOG_HANDLER
-    if _SYSLOG_HANDLER is None:
-        _SYSLOG_HANDLER = handlers.SysLogHandler(
-            address='/dev/log',
-            facility=handlers.SysLogHandler.LOG_DAEMON
-            )
-        _SYSLOG_HANDLER.setLevel(log_level)
-        _SYSLOG_HANDLER.setFormatter(
-            logging.Formatter(
-                '[%(name)-17s %(process)s] - '
-                '%(levelname)s - %(message)s'
-                )
-        )
-    logger.addHandler(_SYSLOG_HANDLER)
-
-
-_UNDEFINED = object()
-_FLAGGED = _UNDEFINED
-_DOCS_NB = 0
+    return _SESSION.get_logger(config, name)
 
 
 def log_doc(logger, pagesnb, filename):
-    global _DOCS_NB
     logger.info(
         "%d page(s) -> %s",
         pagesnb,
         filename)
-    _DOCS_NB += 1
+    _SESSION.docs_nb += 1
 
 
-def _get_mail_subject(config):
-    base_subject = '[{username}]{subject}'.format(
-        username=getpass.getuser(),
-        subject=config.getvalue(('mail', 'subject')) % {
-            'hostname': socket.gethostname(),
-        },
-    )
-    if _FLAGGED is _UNDEFINED:
-        return base_subject
-
-    if _FLAGGED:
-        flag = 'success'
-        return '[success: {documentsnb} docs]{subject}'.format(pages=_DOCS_NB, subject=base_subject)
-
-    flag = 'failed'
-    return '[{flag}]{subject}'.format(flag=flag, subject=base_subject)
-
-
-def _config_maillog(logger, log_level, config):
-    global _MAILLOG_HANDLER
-    if _MAILLOG_HANDLER is None:
-        mail_subject = _get_mail_subject(config)
-        now = datetime.datetime.now()
-        mail_template = _MAIL_TEMPLATE % {
-            'process': os.getpid(),
-            'date': now.strftime("%Y %B %d - %H:%M:%S"),
-            'username': getpass.getuser(),
-        }
-        _MAILLOG_HANDLER = SummarisingLogger(
-            config.getvalue(('mail', 'from')),
-            config.getvalue(('mail', 'to')),
-            mailhost=config.getvalue(('mail', 'host')),
-            subject=mail_subject,
-            send_level=logging.DEBUG,
-            template=mail_template,
-        )
-        _MAILLOG_HANDLER.setFormatter(
-            logging.Formatter('%(levelname)-9s - %(message)s'))
-        _MAILLOG_HANDLER.setLevel(log_level)
-    logger.addHandler(_MAILLOG_HANDLER)
 
 
 def flag_report(success):
     """
     :param bool success: whether we succeeded
     """
-    global _FLAGGED
-    if _MAILLOG_HANDLER is None:
+    if _SESSION.maillog_handler is None:
         # no report
         return
-    if _FLAGGED is not _UNDEFINED:
-        if not _FLAGGED:
+    if _SESSION.flagged is not _UNDEFINED:
+        if not _SESSION.flagged:
             # don't erase 'failed' tag
             return
 
-    _FLAGGED = success
+    _SESSION.flagged = success
     config = Config.getinstance()
-    _MAILLOG_HANDLER.mailer.subject_formatter = SubjectFormatter(
-        _get_mail_subject(config)
+    _SESSION.maillog_handler.mailer.subject_formatter = SubjectFormatter(
+        _SESSION._get_mail_subject(config)
         )
