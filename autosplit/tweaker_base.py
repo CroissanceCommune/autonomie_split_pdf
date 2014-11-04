@@ -34,7 +34,7 @@ from PyPDF2.pdf import Destination
 
 from .config import Config
 from .file_operations import mkdir_p
-from .log_config import mk_logger, log_doc
+from .log_config import mk_logger, log_doc, closing_message
 from .section import Section
 
 
@@ -148,10 +148,8 @@ class PdfTweaker(object):
                 self.logger.critical("No page of output!")
 
             duration = time.clock() - start
-            self.logger.info(
-                    "Total processor time: %s seconds, "
-                    "thank you for your patience",
-                    duration)
+
+            closing_message(self.logger, duration)
 
     def getdata(*args, **kwargs):
         raise NotImplementedError()

@@ -59,16 +59,49 @@ class Session(object):
 
     def get_logger(self, config, name):
         if not self.initialized:
-            _log_init(config)
+            self._log_init(config)
             self.initialized = True
         logger = logging.getLogger(name)
         log_level = config.getvalue('loglevel')
         logger.setLevel(log_level)
+
         if config.getvalue('use_syslog'):
             self._config_syslog(logger, log_level)
+
         if config.getvalue('log_to_mail'):
             self._config_maillog(logger, log_level, config)
+
         return logger
+
+    def log_doc(self, logger, pagesnb, filename):
+        logger.info(
+            "%d page(s) -> %s",
+            pagesnb,
+            filename)
+
+        self.docs_nb += 1
+
+    def flag_report(self, success):
+        if self.maillog_handler is None:
+            # no report
+            return
+        if self.flagged is not _UNDEFINED:
+            if not self.flagged:
+                # don't erase 'failed' tag
+                return
+
+        self.flagged = success
+        config = Config.getinstance()
+        self.maillog_handler.mailer.subject_formatter = SubjectFormatter(
+            self._get_mail_subject(config)
+        )
+
+    def closing_message(self, logger, duration):
+        logger.info(
+            "Total processor time: %s seconds to generate %d documents, "
+            "thank you for your patience",
+            duration, self.docs_nb
+        )
 
     def _config_syslog(self, logger, log_level):
         if self.syslog_handler is None:
@@ -117,20 +150,19 @@ class Session(object):
             self.maillog_handler.setLevel(log_level)
         logger.addHandler(self.maillog_handler)
 
+    def _log_init(self, config):
+        """
+        To be called once, after the desired log level is known
+
+        we fetch the log level in the config
+        """
+        logging.basicConfig(
+            level=config.getvalue('loglevel'),
+            format=_LOGFORMAT
+            )
+
 
 _SESSION = Session()
-
-
-def _log_init(config):
-    """
-    To be called once, after the desired log level is known
-
-    we fetch the log level in the config
-    """
-    logging.basicConfig(
-        level=config.getvalue('loglevel'),
-        format=_LOGFORMAT
-        )
 
 
 def log_exception(logger):
@@ -173,29 +205,14 @@ def mk_logger(name):
 
 
 def log_doc(logger, pagesnb, filename):
-    logger.info(
-        "%d page(s) -> %s",
-        pagesnb,
-        filename)
-    _SESSION.docs_nb += 1
-
-
+    _SESSION.log_doc(logger, pagesnb, filename)
 
 
 def flag_report(success):
     """
-    :param bool success: whether we succeeded
+    :param bool success: Incidate that the process succeeded or failed
     """
-    if _SESSION.maillog_handler is None:
-        # no report
-        return
-    if _SESSION.flagged is not _UNDEFINED:
-        if not _SESSION.flagged:
-            # don't erase 'failed' tag
-            return
+    _SESSION.flag_report(success)
 
-    _SESSION.flagged = success
-    config = Config.getinstance()
-    _SESSION.maillog_handler.mailer.subject_formatter = SubjectFormatter(
-        _SESSION._get_mail_subject(config)
-        )
+def closing_message(logger, duration):
+    _SESSION.closing_message(logger, duration)
