@@ -50,14 +50,15 @@ def unix_sanitize(some_name):
 
 class PdfTweaker(object):
 
-    def __init__(self, year, month):
+    def __init__(self, inputfile):
         self.logger = mk_logger('autosplit.tweaker')
         config = Config.getinstance()
         self.config = config
-        self.year = year
-        self.month = month
+        self.inputfile = inputfile
         self.last_print_page = 0
-        self.output_dir = os.path.join(self._DOCTYPE, self.year, self.month)
+        self.output_dir = os.path.join(
+            self._DOCTYPE, self.inputfile.year, self.inputfile.month
+        )
         self.pages_to_process = self.restrict = self.config.getvalue('restrict')
         self.offset = 0
         self.outlinedata = []
@@ -67,6 +68,9 @@ class PdfTweaker(object):
 
         # list of (name, ancode)
         self.alldata = []
+
+    def get_doctype(self):
+        return self._DOCTYPE
 
     def make_process(self, argv_seq):
         try:

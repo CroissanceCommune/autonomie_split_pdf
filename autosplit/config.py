@@ -22,10 +22,12 @@
 # along with Autonomie. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from copy import deepcopy
+from collections import namedtuple
 import logging
+import os
 import os.path as ospath
+import re
 import yaml
 
 
@@ -35,14 +37,22 @@ DEFAULT_CONFIGFILE = ospath.join(
 
 
 _UNSET = object()
+_FILENAMESRE = re.compile(
+    r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
+    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf',
+    re.IGNORECASE
+    )
+
 
 class Error(Exception):
     def __init__(self, message):
         self.message = message
 
+
 class Config(object):
     DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,
-    'restrict': 0, 'payroll_preprocessor': './payrollpdf2ancode.sh'}
+    'restrict': 0, 'payroll_preprocessor': './payrollpdf2ancode.sh', 'mail':
+    {'subject': '[%(hostname)s] Log of autonomie pdf splitter',}}
 
     _INSTANCE = None
 
@@ -51,6 +61,11 @@ class Config(object):
         if cls._INSTANCE is None:
             cls._INSTANCE = Config()
         return cls._INSTANCE
+
+    def __init__(self):
+        self.confvalues = {}
+        self.parsed_args = None
+        self.inputfiles = []
 
     def load_args(self, parsed_args):
         configstream = parsed_args.configfile
@@ -62,6 +77,24 @@ class Config(object):
         self._setverb()
 
         self.confvalues['restrict'] = self.parsed_args.restrict
+        self.inputfiles = list(self._parse_inputfiles(parsed_args))
+
+    def _parse_inputfiles(self, parsed_args):
+        inputfile = namedtuple('inputfile',
+            ['doctype', 'year', 'month', 'filepath', 'filedescriptor']
+        )
+
+        for openfile in parsed_args.files:
+            # argparse has already open the files
+            bare_filename = os.path.split(openfile.name)[-1]
+            parsed = _FILENAMESRE.match(bare_filename)
+            yield inputfile(
+                parsed.group('DOCTYPE'),
+                parsed.group('YEAR'),
+                parsed.group('MONTH'),
+                openfile.name,
+                openfile,
+            )
 
     def _setverb(self):
         if self.parsed_args.verbose:

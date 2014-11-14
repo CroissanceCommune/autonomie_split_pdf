@@ -120,7 +120,13 @@ class PayrollTweaker(PdfTweaker):
 
     def parse_single_value(self, value, marker_re):
         if not marker_re.match(value):
-            raise ParseError("Didn't find expected output marker: '%s' in '%s'" % (marker_re.pattern, value))
+            raise ParseError(
+                "Didn't find expected output marker: "
+                "'{pattern}' in '{value}'".format(
+                    pattern=marker_re.pattern,
+                    value=value,
+                )
+            )
         return marker_re.sub('', value)
 
 
@@ -143,9 +149,9 @@ class ResultAndSituationTweaker(OutlineTweaker):
     _DOCTYPE = 'resultat-tresorerie'
     _UNITARY_TIME = 0.1
 
-    def __init__(self, year, month):
-        self.result = ResultTweaker(year, month)
-        self.situation = SituationTweaker(year, month)
+    def __init__(self, inputfile):
+        self.result = ResultTweaker(inputfile)
+        self.situation = SituationTweaker(inputfile)
 
     def tweak(self, pdfstream):
 

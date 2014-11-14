@@ -38,18 +38,11 @@ __status__ = "Development"
 import hashlib
 import logging
 import os.path
-import re
 
 from .config import Config, DEFAULT_CONFIGFILE, Error as ConfigError
 from .log_config import log_exception, mk_logger, flag_report
 from .tweaker import DOC_TWEAKERS
 
-
-_FILENAMESRE = re.compile(
-    r'(?P<DOCTYPE>[^_]+)_(?P<YEAR>'
-    '[0-9]+)_(?P<MONTH>[^_]+)\.pdf',
-    re.IGNORECASE
-    )
 
 
 def get_md5sum(openfile):
@@ -110,19 +103,13 @@ def main():
     if limit != 0:
         logger.info("Analysis restricted to pages <= %d", limit)
 
-    for openfile in arguments.files:
-        bare_filename = os.path.split(openfile.name)[-1]
-        parsed = _FILENAMESRE.match(bare_filename)
-        doctype = parsed.group('DOCTYPE')
-        year = parsed.group('YEAR')
-        month = parsed.group('MONTH')
+    for inputfile in config.inputfiles:
 
-        # argparse has already open the files
-        logger.info('Loading PDF "%s"', openfile.name)
-        logger.info('md5 hash: %s', get_md5sum(open(openfile.name, 'rb')))
+        logger.info('Loading PDF "%s"', inputfile.filepath)
+        logger.info('md5 hash: %s', get_md5sum(open(inputfile.filepath, 'rb')))
 
         try:
-            tweaker = DOC_TWEAKERS[doctype](year, month)
+            tweaker = DOC_TWEAKERS[inputfile.doctype](inputfile)
         except ConfigError, exception:
             logger.critical(
                 "Error in your configuration: %s", exception.message
@@ -136,7 +123,7 @@ def main():
             raise
 
         try:
-            tweaker.tweak(openfile)
+            tweaker.tweak(inputfile.filedescriptor)
         except BaseException:
             logger.exception(
                 "Exception not handled by the splitter, that's a bug, sorry."

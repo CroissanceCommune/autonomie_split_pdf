@@ -39,6 +39,18 @@ from .config import Config
 _LOGFORMAT = \
     "%(asctime)s [pid %(process)s][%(name)-20s]" \
     "[%(levelname)-8s] %(message)s"
+_MAIL_TEMPLATE = u"""
+PDF Splitter for Autonomie.
+
+User: {username}
+Server: {fqdn}
+PID: {process}
+Time: {date}
+
+Following are all messages logged by the process on this run.
+
+%s
+"""
 
 
 _UNDEFINED = object()
@@ -119,24 +131,34 @@ class Session(object):
         logger.addHandler(self.syslog_handler)
 
     def _get_mail_subject(self, config):
-        return '{flagstr}[{username}][{documentsnb} docs]{subject}'.format(
+        # sometimes hostname is the fqdn
+        ensure_hostname = socket.gethostname().split('.')[0]
+        try:
+            doctypes = ', '.join(
+                inputfile.doctype for inputfile in config.inputfiles
+            )
+        except Exception, err:
+            doctypes = 'error fetching doctypes: {}'.format(err)
+        return '{flagstr}[{username} / {doctypes}][{documentsnb} docs]{subject}'.format(
             documentsnb=self.docs_nb,
             flagstr=_FLAGS_STRS[self.flagged],
             subject=config.getvalue(('mail', 'subject')) % {
-                'hostname': socket.gethostname(),
+                'hostname': ensure_hostname,
             },
             username=getpass.getuser(),
+            doctypes=doctypes,
         )
 
     def _config_maillog(self, logger, log_level, config):
         if self.maillog_handler is None:
             mail_subject = self._get_mail_subject(config)
             now = datetime.datetime.now()
-            mail_template = _MAIL_TEMPLATE % {
-                'process': os.getpid(),
-                'date': now.strftime("%Y %B %d - %H:%M:%S"),
-                'username': getpass.getuser(),
-            }
+            mail_template = _MAIL_TEMPLATE.format(
+                fqdn=socket.getfqdn(),
+                process=os.getpid(),
+                date=now.strftime("%Y %B %d - %H:%M:%S"),
+                username=getpass.getuser(),
+            )
             self.maillog_handler = SummarisingLogger(
                 config.getvalue(('mail', 'from')),
                 config.getvalue(('mail', 'to')),
@@ -182,18 +204,6 @@ def log_exception(logger):
         if line:
             logger.debug("exc info: %s", line)
 
-
-_MAIL_TEMPLATE = u"""
-PDF Splitter for Autonomie.
-
-User: %(username)s
-PID: %(process)s
-Time: %(date)s
-
-Following are all messages logged by the process on this run.
-
-%%s
-"""
 
 
 def mk_logger(name):
