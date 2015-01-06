@@ -34,13 +34,18 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from PyPDF2.pdf import Destination
 
 from .config import Config
+from .errors import AutosplitError
 from .file_operations import mkdir_p
-from .log_config import mk_logger, log_doc, closing_message
+from .log_config import mk_logger, log_doc, log_errordoc, closing_message
 from .section import Section
 
 
 _UNIX_VALID = re.compile('[^\w\s-]')
 _NOSPACES = re.compile('[-\s]+')
+
+
+class Incoherence(AutosplitError):
+    pass
 
 
 def unix_sanitize(some_name):
@@ -70,6 +75,8 @@ class PdfTweaker(object):
 
         # list of (name, ancode)
         self.alldata = []
+
+        self.generated_pages = set()
 
     def get_doctype(self):
         return self._DOCTYPE
@@ -217,19 +224,27 @@ class PdfTweaker(object):
             outfname = self.get_outfname(name, ancode)
         else:
             outfname = self.get_outfname(ancode, name)
+
+        if outfname in self.generated_pages:
+            raise Incoherence("Already generated file with path {}".format(
+                outfname
+                )
+            )
+        self.generated_pages.add(outfname)
         with open(outfname, 'wb') as wfd:
             log_doc(self.logger, nb_print_pages, outfname)
             output.write(wfd)
 
         if not self.check_splitpage(outfname, name, ancode):
-            if not os.path.isdir(self.pb_dir):
-                os.mkdir(self.pb_dir)
             newdest = os.path.join(self.pb_dir, os.path.basename(outfname))
+            log_errordoc(self.logger, nb_print_pages, newdest)
             self.logger.critical(
                 "Check failed for %s. Moved to %s",
                 outfname,
                 newdest
             )
+            if not os.path.isdir(self.pb_dir):
+                os.mkdir(self.pb_dir)
             shutil.move(outfname, newdest)
 
     def get_outfname(self, ancode, entrepreneur):

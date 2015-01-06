@@ -30,11 +30,13 @@ import os
 import re
 from tempfile import mkstemp
 
+from .errors import AutosplitError
 from .tweaker_base import PdfTweaker, OutlineTweaker
 from . import config
 from .log_config import flag_report
 
-class ParseError(Exception):
+
+class ParseError(AutosplitError):
     pass
 
 

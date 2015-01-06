@@ -1,0 +1,2 @@
+class AutosplitError(Exception):
+    pass

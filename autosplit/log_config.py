@@ -65,6 +65,7 @@ class Session(object):
     def __init__(self):
         self.flagged = _UNDEFINED
         self.docs_nb = 0
+        self.errordocs_nb = 0
         self.maillog_handler = None
         self.syslog_handler = None
         self.initialized = False
@@ -93,6 +94,14 @@ class Session(object):
 
         self.docs_nb += 1
 
+    def log_errordoc(self, logger, pagesnb, filename):
+        logger.info(
+            "%d page(s) -> %s",
+            pagesnb,
+            filename)
+
+        self.errordocs_nb += 1
+
     def flag_report(self, success):
         if self.maillog_handler is None:
             # no report
@@ -113,6 +122,14 @@ class Session(object):
             "Total processor time: %s seconds to generate %d documents, "
             "thank you for your patience",
             duration, self.docs_nb
+        )
+
+        if not self.errordocs_nb:
+            return
+
+        logger.error(
+            "There were %d docs with errors",
+            self.errordocs_nb
         )
 
     def _config_syslog(self, logger, log_level):
@@ -216,6 +233,9 @@ def mk_logger(name):
 
 def log_doc(logger, pagesnb, filename):
     _SESSION.log_doc(logger, pagesnb, filename)
+
+def log_errordoc(logger, pagesnb, filename):
+    _SESSION.log_errordoc(logger, pagesnb, filename)
 
 
 def flag_report(success):

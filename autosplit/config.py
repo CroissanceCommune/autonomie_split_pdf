@@ -30,6 +30,8 @@ import os.path as ospath
 import re
 import yaml
 
+from .errors import AutosplitError
+
 
 DEFAULT_CONFIGFILE = ospath.join(
     ospath.expanduser("~"),
@@ -44,7 +46,7 @@ _FILENAMESRE = re.compile(
     )
 
 
-class Error(Exception):
+class Error(AutosplitError):
     def __init__(self, message):
         self.message = message
 
