@@ -24,7 +24,8 @@
 
 from collections import Iterable
 from subprocess import Popen, PIPE
-import os.path
+import os
+import shutil
 import re
 import time
 import unicodedata
@@ -60,6 +61,7 @@ class PdfTweaker(object):
             self._DOCTYPE, self.inputfile.year, self.inputfile.month
         )
         self.pages_to_process = self.restrict = self.config.getvalue('restrict')
+        self.pb_dir = self.config.getvalue('pb_dir')
         self.offset = 0
         self.outlinedata = []
 
@@ -87,6 +89,7 @@ class PdfTweaker(object):
         :return: stdout and stderr as unicode decodable strings, return code as
         int
         """
+        self.logger.debug("Running command %s", " ".join(argv_seq))
         process = self.make_process(argv_seq)
         stdout, stderr = process.communicate()
         returncode = process.returncode
@@ -218,9 +221,30 @@ class PdfTweaker(object):
             log_doc(self.logger, nb_print_pages, outfname)
             output.write(wfd)
 
+        if not self.check_splitpage(outfname, name, ancode):
+            if not os.path.isdir(self.pb_dir):
+                os.mkdir(self.pb_dir)
+            newdest = os.path.join(self.pb_dir, os.path.basename(outfname))
+            self.logger.critical(
+                "Check failed for %s. Moved to %s",
+                outfname,
+                newdest
+            )
+            shutil.move(outfname, newdest)
+
     def get_outfname(self, ancode, entrepreneur):
         outfname = '%s_%s' % (ancode, entrepreneur)
         return "%s/%s.pdf" % (self.output_dir, unix_sanitize(outfname))
+
+    def check_splitpage(self, file_to_check, name, ancode):
+        """
+        Subclass this method in tweakers.
+
+        :returns: bool
+
+        It is the responsibility of this method to log.
+        """
+        return True
 
 
 class OutlineTweaker(PdfTweaker):

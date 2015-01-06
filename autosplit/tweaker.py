@@ -32,6 +32,7 @@ from tempfile import mkstemp
 
 from .tweaker_base import PdfTweaker, OutlineTweaker
 from . import config
+from .log_config import flag_report
 
 class ParseError(Exception):
     pass
@@ -46,6 +47,7 @@ class PayrollTweaker(PdfTweaker):
 
     def __init__(self, *args):
         PdfTweaker.__init__(self, *args)
+        self._notfoundpages = 0
         self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
         if not os.path.exists(self.preprocessor):
             raise config.Error(
@@ -114,9 +116,39 @@ class PayrollTweaker(PdfTweaker):
 
         if not name:
             name = "NO_NAME_FOUND"
+            self._notfoundpages += 1
+            flag_report(False)
 
         self.logger.info("Page %d: %s %s", pagenb, ancode, name)
         return ancode, name
+
+    def check_splitpage(self, file_to_check, name, ancode):
+        command = ["pdftotext", "-q", "-layout", file_to_check, '-'] # - is for stdout
+        stdout, stderr, returncode = self.get_command_outputs(command)
+        stdout = stdout.decode('utf-8')  # this is utf-8 and python2 thinks it is ascii
+        stdout = ' '.join(stdout.split())  # normalize spaces
+        if returncode != 0:
+            self.logger.critical(
+                'While checking correct parsing, pdftotext '
+                'exit status is %d', returncode
+            )
+            return False
+
+        if name not in stdout:
+            self.logger.critical(
+                'While checking correct parsing, name %s not found '
+                'in %s', name, file_to_check
+            )
+            return False
+
+        if ancode not in stdout:
+            self.logger.critical(
+                'While checking correct parsing, analytic code %s not found '
+                'in %s', ancode, file_to_check
+            )
+            return False
+
+        return True
 
     def parse_single_value(self, value, marker_re):
         if not marker_re.match(value):
