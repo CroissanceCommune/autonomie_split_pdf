@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# How to find the parameters:
+#
+# pdftotext -q -layout -f 1 -l 1 file.pdf outfile.txt
+# view outfile.txt
+# Find the column/line for name (including M, Mme or Mlle) and analytic code
+# Take some margin on the left
+
 set -e
 set -u
 
@@ -12,6 +19,7 @@ ANCODE_LINE=11
 # the same as above
 ALTERNATE_ANCODE_LINE=11
 ANCODE_COL=45
+ANCODE_MAXCOL=90
 NAME_COL=90
 NAME_LINE=9
 # the same as above
@@ -28,7 +36,7 @@ pdftotext -q -layout -f $PAGE -l $PAGE "${FILE}" $outfile
 
 function getancode() {
     _ANCODE_LINE=${1}
-    ANCODE=`awk "NR==${_ANCODE_LINE} {print;}" $outfile |cut -c ${ANCODE_COL}- |sed -e 's/^ \+//' -e 's/ .*//'`
+    ANCODE=`awk "NR==${_ANCODE_LINE} {print;}" $outfile |cut -c ${ANCODE_COL}-${ANCODE_MAXCOL} |sed -e 's/^ \+//' -e 's/ .*//'`
     ANCODE=`echo ${ANCODE}|sed -e 's/^ \+//'`
 }
 
