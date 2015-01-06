@@ -121,7 +121,7 @@ class PayrollTweaker(PdfTweaker):
             self._notfoundpages += 1
             flag_report(False)
 
-        unique_key = u'{0}_{1}_{2}'.format(pagenb, ancode, name)
+        unique_key = u'{0}_{1}'.format(ancode, name)
         if unique_key in self.registered_infos:
             raise Incoherence(u'{0} already registered'.format(unique_key))
         self.registered_infos.add(unique_key)
