@@ -76,6 +76,7 @@ class PdfTweaker(object):
         # list of (name, ancode)
         self.alldata = []
 
+        self.registered_infos = set()
         self.generated_pages = set()
 
     def get_doctype(self):
@@ -310,6 +311,15 @@ class OutlineTweaker(PdfTweaker):
                         *item)
                     self.outlinedata.append(item + (reader,))
                     self.alldata.append((item[3], item[2]))
+                    unique_key = '{0}_{1}'.format(
+                        item[3], item[3]
+                    )
+                    if unique_key in self.registered_infos:
+                        raise Incoherence('{0} already registered'.format(
+                            unique_key
+                            )
+                        )
+                    self.registered_infos.add(unique_key)
                 logger.debug("End of a 2nd level section")
             logger.debug("End of a 1st level section")
 
