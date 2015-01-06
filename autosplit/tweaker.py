@@ -31,7 +31,7 @@ import re
 from tempfile import mkstemp
 
 from .errors import AutosplitError
-from .tweaker_base import PdfTweaker, OutlineTweaker
+from .tweaker_base import Incoherence, PdfTweaker, OutlineTweaker
 from . import config
 from .log_config import flag_report
 
@@ -120,6 +120,11 @@ class PayrollTweaker(PdfTweaker):
             name = "NO_NAME_FOUND"
             self._notfoundpages += 1
             flag_report(False)
+
+        unique_key = u'{0}_{1}_{2}'.format(pagenb, ancode, name)
+        if unique_key in self.registered_infos:
+            raise Incoherence(u'{0} already registered'.format(unique_key))
+        self.registered_infos.add(unique_key)
 
         self.logger.info("Page %d: %s %s", pagenb, ancode, name)
         return ancode, name
