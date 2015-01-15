@@ -1,3 +1,4 @@
 PyYAML
 PyPDF2
 mailinglogger
+Unidecode==0.04.17

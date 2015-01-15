@@ -29,6 +29,7 @@ import shutil
 import re
 import time
 import unicodedata
+import unidecode
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from PyPDF2.pdf import Destination
@@ -311,9 +312,10 @@ class OutlineTweaker(PdfTweaker):
                         *item)
                     self.outlinedata.append(item + (reader,))
                     self.alldata.append((item[3], item[2]))
-                    unique_key = '{0}_{1}'.format(
-                        item[3], item[3]
+                    unique_key = u'{0}_{1}'.format(
+                        unidecode.unidecode(item[3]), unidecode.unidecode(item[2])
                     )
+                    self.logger.debug("unique_key: %s", unique_key)
                     if unique_key in self.registered_infos:
                         raise Incoherence('{0} already registered'.format(
                             unique_key
