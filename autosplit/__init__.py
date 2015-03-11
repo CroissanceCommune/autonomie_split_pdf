@@ -109,11 +109,13 @@ def main():
         logger.info('md5 hash: %s', get_md5sum(open(inputfile.filepath, 'rb')))
 
         if inputfile.doctype not in DOC_TWEAKERS:
-            log_exception(logger)
-            raise AutosplitError(
+            error_msg = (
                 "The given name '{}' isn't recognized by autosplit splitters: "
                 "{}".format(inputfile.doctype, DOC_TWEAKERS.keys())
             )
+            logger.error(error_msg)
+            log_exception(logger)
+            raise AutosplitError(error_msg)
 
         try:
             tweaker = DOC_TWEAKERS[inputfile.doctype](inputfile)
