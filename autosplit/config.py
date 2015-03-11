@@ -99,6 +99,13 @@ class Config(object):
             # argparse has already open the files
             bare_filename = os.path.split(openfile.name)[-1]
             parsed = _FILENAMESRE.match(bare_filename)
+
+            if parsed is None:
+                raise AutosplitError(
+                    "Given filename '{}' doesn't match the regexp:\n{}"
+                    .format(bare_filename, _FILENAMESRE.pattern)
+                )
+
             yield inputfile(
                 parsed.group('DOCTYPE'),
                 parsed.group('YEAR'),
