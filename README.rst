@@ -119,5 +119,6 @@ Known problems
 Writing a payroll RC file
 -------------------------
 
-use pdf2txt once on the file, find the relevant lines/cols for informations,
-there you are.
+Use pdf2txt -q -layout once on the file. In the output txt file, find the line and
+the column where the ANCODE is written, then set the ANCODE_LINE and ANCODE_COL
+accordingly. Do the same for the NAME, with NAME_LINE, NAME_COL.
