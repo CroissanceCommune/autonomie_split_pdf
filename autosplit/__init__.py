@@ -93,15 +93,29 @@ def main():
 
     arguments = parser.parse_args()
 
+    error = None
     config = Config.getinstance()
-    config.load_args(arguments)
+    try:
+        config.load_args(arguments)
+    except Exception, exception:
+        error = exception
+
     logger = mk_logger("autosplit.main")
     logger.info(version())
     logger.debug("Current working directory: %s", os.getcwd())
+
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
     limit = config.getvalue('restrict')
+
     if limit != 0:
         logger.info("Analysis restricted to pages <= %d", limit)
+
+    if error:
+        # We wait until the logger is configured, especially if log_to_mail
+        # is True, to get a proper logging of the exception
+        logger.error(error)
+        log_exception(logger)
+        raise AutosplitError(error)
 
     for inputfile in config.inputfiles:
 
