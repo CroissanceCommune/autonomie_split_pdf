@@ -42,7 +42,7 @@ import os.path
 from .config import Config, DEFAULT_CONFIGFILE, Error as ConfigError
 from .log_config import log_exception, mk_logger, flag_report
 from .tweaker import DOC_TWEAKERS
-
+from .errors import AutosplitError
 
 
 def get_md5sum(openfile):
@@ -107,6 +107,13 @@ def main():
 
         logger.info('Loading PDF "%s"', inputfile.filepath)
         logger.info('md5 hash: %s', get_md5sum(open(inputfile.filepath, 'rb')))
+
+        if inputfile.doctype not in DOC_TWEAKERS:
+            log_exception(logger)
+            raise AutosplitError(
+                "The given name '{}' isn't recognized by autosplit splitters: "
+                "{}".format(inputfile.doctype, DOC_TWEAKERS.keys())
+            )
 
         try:
             tweaker = DOC_TWEAKERS[inputfile.doctype](inputfile)
