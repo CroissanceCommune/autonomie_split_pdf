@@ -52,10 +52,15 @@ class Error(AutosplitError):
 
 
 class Config(object):
-    DEFAULTS = {'verbosity': 'INFO', 'loglevel': 20, 'use_syslog': False,
-    'restrict': 0, 'payroll_preprocessor': './payrollpdf2ancode.sh', 'mail':
-    {'subject': '[%(hostname)s] Log of autonomie pdf splitter',},
-    'pb_dir': os.path.join(os.environ['HOME'], 'problems')}
+    DEFAULTS = {
+        'verbosity': 'INFO',
+        'loglevel': 20,
+        'use_syslog': False,
+        'restrict': 0,
+        'payroll_preprocessor': './payrollpdf2ancode.sh',
+        'mail': {'subject': '[%(hostname)s] Log of autonomie pdf splitter', },
+        'pb_dir': os.path.join(os.environ['HOME'], 'problems')
+    }
 
     _INSTANCE = None
 
