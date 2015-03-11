@@ -58,7 +58,9 @@ class Config(object):
         'use_syslog': False,
         'log_to_mail': False,
         'restrict': 0,
-        'payroll_preprocessor': './payrollpdf2ancode.sh',
+        'payroll': {
+            'preprocessor': './payrollpdf2ancode.sh',
+        },
         'mail': {'subject': '[%(hostname)s] Log of autonomie pdf splitter', },
         'pb_dir': os.path.join(os.environ['HOME'], 'problems')
     }
