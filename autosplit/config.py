@@ -56,6 +56,7 @@ class Config(object):
         'verbosity': 'INFO',
         'loglevel': 20,
         'use_syslog': False,
+        'log_to_mail': False,
         'restrict': 0,
         'payroll_preprocessor': './payrollpdf2ancode.sh',
         'mail': {'subject': '[%(hostname)s] Log of autonomie pdf splitter', },
