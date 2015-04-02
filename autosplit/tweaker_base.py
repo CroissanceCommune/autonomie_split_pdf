@@ -134,7 +134,7 @@ class PdfTweaker(object):
             self.logger.info("%s has %d pages", filename, pages_nb)
             self.logger.info(
                 "Estimated time for completion of %d pages on "
-                "an average computer: %.f seconds. Please stand while "
+                "an average computer: %.f seconds. Please stand by while "
                 "the parsing takes place.",
                 self.pages_to_process,
                 self._UNITARY_TIME*self.pages_to_process
