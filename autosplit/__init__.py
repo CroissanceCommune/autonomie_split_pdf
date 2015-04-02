@@ -147,6 +147,9 @@ def main():
 
         try:
             tweaker.tweak(inputfile.filedescriptor)
+        except AutosplitError, error:
+            logger.error(error.message)
+            flag_report(False)
         except BaseException:
             logger.exception(
                 "Exception not handled by the splitter, that's a bug, sorry."
