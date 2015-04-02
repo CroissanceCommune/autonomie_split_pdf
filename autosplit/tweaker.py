@@ -116,10 +116,23 @@ class PayrollTweaker(PdfTweaker):
         ancode = self.parse_single_value(stdout_lines[0], self._ANCODE_MARKER)
         name = self.parse_single_value(stdout_lines[1], self._NAME_MARKER)
 
-        if not name:
-            name = "NO_NAME_FOUND"
-            self._notfoundpages += 1
+        if not (name and ancode):
             flag_report(False)
+            if not name:
+                field = "Name"
+            else:
+                field = "Ancode"
+
+            import os
+            home = os.environ['HOME']
+            command_str = " ".join(command)
+
+            raise AutosplitError(
+                (
+                    "{} field wasn't correctly extracted. Try the "
+                    "following:\nHOME={} {}"
+                ).format(field, home, command_str)
+            )
 
         unique_key = u'{0}_{1}'.format(ancode, name)
         if unique_key in self.registered_infos:
