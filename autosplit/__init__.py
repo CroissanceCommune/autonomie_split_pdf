@@ -38,6 +38,7 @@ __status__ = "Development"
 import hashlib
 import logging
 import os.path
+import sys
 
 from .config import Config, DEFAULT_CONFIGFILE, Error as ConfigError
 from .log_config import log_exception, mk_logger, flag_report
@@ -85,6 +86,12 @@ def main():
                         help='verbose output', default=False)
     parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
                         type=int, default=0)
+    parser.add_argument('-n', '--no-entr-name',
+        help="Doc structure has no names: "
+        "it only has analytic codes",
+        action='store_true',
+        default=False
+    )
     parser.add_argument(
         '-V', '--version',
         action='version',
@@ -102,6 +109,8 @@ def main():
 
     logger = mk_logger("autosplit.main")
     logger.info(version())
+    logger.debug("Command line: %s", sys.argv)
+    logger.debug("Parsed arguments: %s", arguments)
     logger.debug("Current working directory: %s", os.getcwd())
 
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
