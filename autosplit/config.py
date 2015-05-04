@@ -57,6 +57,7 @@ class Config(object):
         'loglevel': 20,
         'use_syslog': False,
         'log_to_mail': False,
+        'no_entr_name': False,
         'restrict': 0,
         'payroll': {
             'preprocessor': './payrollpdf2ancode.sh',
@@ -89,6 +90,7 @@ class Config(object):
 
         self.confvalues['restrict'] = self.parsed_args.restrict
         self.inputfiles = list(self._parse_inputfiles(parsed_args))
+        self.confvalues['no_entr_name'] = self.parsed_args.no_entr_name
 
     def _parse_inputfiles(self, parsed_args):
         inputfile = namedtuple('inputfile',
