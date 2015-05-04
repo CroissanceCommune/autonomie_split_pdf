@@ -39,6 +39,7 @@ from .errors import AutosplitError
 from .file_operations import mkdir_p
 from .log_config import mk_logger, log_doc, log_errordoc, closing_message
 from .section import Section
+from .section import VirtualSection
 
 
 _UNIX_VALID = re.compile('[^\w\s-]')
@@ -278,13 +279,19 @@ class OutlineTweaker(PdfTweaker):
         :param int skip_sections: see :func:`tweak`
         :param int mainsections_count: see :func:`tweak`
         """
+
         outlines = reader.getOutlines()
         logger = mk_logger('autosplit.getdata')
+        no_entr_name = self.config.getvalue('no_entr_name')
+        if no_entr_name:
+            logger.critical(
+                "Single level outline (no_entr_name) : cannot infer"
+                " entrepreneur name"
+            )
 
         logger.info("Parsing outlines. Output below")
-        recursive_outlines = self.browse(outlines)
+        recursive_outlines = self.browse(outlines, no_entr_name=no_entr_name)
         logger.info("Browsed outlines")
-
 
         entre_nb = 0
         for first_level_section in recursive_outlines:
@@ -301,34 +308,42 @@ class OutlineTweaker(PdfTweaker):
                 if mainsections_count < 0:
                     logger.debug("This was the last section.")
                     return True
-            for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
-                self.logger.debug("Entering a 2nd level section")
-                for item in entrepreneur:
-                    assert all(value >= 0 for value in item[:2]), \
-                        "section contents: startpage:%3i - length: %i - %-7s '%s'" \
-                        % item
 
-                    logger.debug("startpage:%3i - length: %i - %-7s '%s'",
-                        *item)
-                    self.outlinedata.append(item + (reader,))
-                    self.alldata.append((item[3], item[2]))
-                    unique_key = u'{0}_{1}'.format(
-                        unidecode.unidecode(item[3]), unidecode.unidecode(item[2])
-                    )
-                    self.logger.debug("unique_key: %s", unique_key)
-                    if unique_key in self.registered_infos:
-                        raise Incoherence('{0} already registered'.format(
-                            unique_key
-                            )
-                        )
-                    self.registered_infos.add(unique_key)
-                logger.debug("End of a 2nd level section")
+            else:
+                for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
+                    self.logger.debug("Entering a 2nd level section")
+                    for item in entrepreneur:
+                        self._browse_ancode_level(item, reader, logger)
+                    logger.debug("End of a 2nd level section")
             logger.debug("End of a 1st level section")
 
         logger.info("Found %i entrepreneurs and %i analytic codes",
             entre_nb + 1, len(self.alldata))
         logger.info("ETA: %s s", len(self.alldata) * 0.4)
         return True
+
+    def _browse_ancode_level(self, outline_item, reader, logger):
+        """
+        :param tuple outline_item:
+        """
+        assert all(value >= 0 for value in outline_item[:2]), \
+            "section contents: startpage:%3i - length: %i - %-7s '%s'" \
+            % outline_item
+
+        logger.debug("startpage:%3i - length: %i - %-7s '%s'",
+            *outline_item)
+        self.outlinedata.append(outline_item + (reader,))
+        self.alldata.append((outline_item[3], outline_item[2]))
+        unique_key = u'{0}_{1}'.format(
+            unidecode.unidecode(outline_item[3]), unidecode.unidecode(outline_item[2])
+        )
+        self.logger.debug("unique_key: %s", unique_key)
+        if unique_key in self.registered_infos:
+            raise Incoherence('{0} already registered'.format(
+                unique_key
+                )
+            )
+        self.registered_infos.add(unique_key)
 
     def get_section_boundaries(self):
         assert self.section_pages, "section_pages was 0 or None"
@@ -413,7 +428,7 @@ class OutlineTweaker(PdfTweaker):
         """
         pass
 
-    def browse(self, outline, level=0, previous_section=None):
+    def browse(self, outline, level=0, previous_section=None, no_entr_name=False):
         """
         Offset will be calculated once, on the first outline
 
@@ -424,6 +439,13 @@ class OutlineTweaker(PdfTweaker):
         :param Section previous_section: this recursive function tells itself
         the last built section
         """
+        if no_entr_name and level == 1:
+            # Skip level 1 when there is no_entr_name
+            # Hack for appuy
+            level = 2
+
+        container_section = None
+
         start_ends = []
         for destination in outline:
             if isinstance(destination, Destination):
@@ -442,12 +464,21 @@ class OutlineTweaker(PdfTweaker):
                 start_ends.append(section)
                 self.logger.debug("Done reading section: %s", section)
             elif isinstance(destination, Iterable):
+                if no_entr_name:
+                    # again, the hack for appuy
+                    # Make a virtual section when needed
+                    if container_section is None:
+                        container_section = VirtualSection(previous_section)
+                    previous_section.add_subsections([container_section])
+                else:
+                    container_section = previous_section
                 self.logger.debug("Reading section container (parent=%s)", previous_section)
                 lower_level_sections = self.browse(
                     destination, level + 1,
-                    previous_section=previous_section,
+                    previous_section=container_section,
+                    no_entr_name=no_entr_name,
                     )
-                previous_section.add_subsections(lower_level_sections)
+                container_section.add_subsections(lower_level_sections)
             else:
                 self.logger.critical(
                     "Unexpected type for a destination: %s",
