@@ -309,12 +309,11 @@ class OutlineTweaker(PdfTweaker):
                     logger.debug("This was the last section.")
                     return True
 
-            else:
-                for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
-                    self.logger.debug("Entering a 2nd level section")
-                    for item in entrepreneur:
-                        self._browse_ancode_level(item, reader, logger)
-                    logger.debug("End of a 2nd level section")
+            for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
+                self.logger.debug("Entering a 2nd level section")
+                for item in entrepreneur:
+                    self._browse_ancode_level(item, reader, logger)
+                logger.debug("End of a 2nd level section")
             logger.debug("End of a 1st level section")
 
         logger.info("Found %i entrepreneurs and %i analytic codes",
