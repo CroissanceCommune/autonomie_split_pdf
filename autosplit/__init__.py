@@ -133,8 +133,8 @@ def main():
 
         if inputfile.doctype not in DOC_TWEAKERS:
             error_msg = (
-                "The given name '{}' isn't recognized by autosplit splitters: "
-                "{}".format(inputfile.doctype, DOC_TWEAKERS.keys())
+                "The filename isn't recognized by autosplit splitters: "
+                "{}".format(DOC_TWEAKERS.keys())
             )
             logger.error(error_msg)
             log_exception(logger)
