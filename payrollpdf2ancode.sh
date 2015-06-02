@@ -17,19 +17,29 @@ outfile=`tempfile`
 # Overwritten in specific config
 ANCODE_LINE=11
 # the same as above
-ALTERNATE_ANCODE_LINE=11
+ALTERNATE_ANCODE_LINE=-1
 ANCODE_COL=45
 ANCODE_MAXCOL=90
 NAME_COL=90
 NAME_LINE=9
 # the same as above
-ALTERNATE_NAME_LINE=9
+ALTERNATE_NAME_LINE=-1
 
 SPECIFIC_CONFIG="$HOME/payroll_rc"
 
 if [ -f ${SPECIFIC_CONFIG} ]
     then
     . ${SPECIFIC_CONFIG}
+fi
+
+# If the alternate line number is not specified, we use the base line number
+if [ ALTERNATE_ANCODE_LINE == -1 ]
+then
+    ALTERNATE_ANCODE_LINE=ANCODE_LINE
+fi
+if [ ALTERNATE_NAME_LINE == -1 ]
+then
+    ALTERNATE_NAME_LINE=NAME_LINE
 fi
 
 pdftotext -q -layout -f $PAGE -l $PAGE "${FILE}" $outfile
@@ -46,20 +56,24 @@ function getname() {
     NAME=`echo ${NAME}|sed -e 's/^ \+//' -e 's/^Mme \+//' -e 's/^Mlle \+//' -e 's/^M \+//'`
 }
 
-getancode ${ANCODE_LINE}
-
-if [ "x${ANCODE}" == "x" ]
+for i in $(seq ${ANCODE_LINE} ${ALTERNATE_ANCODE_LINE})
+do
+    getancode ${i}
+    if [ "x${ANCODE}" != "x" ]
     then
-    getancode ${ALTERNATE_ANCODE_LINE}
-fi
+        break
+    fi
+done
+echo "ANCODE ${ANCODE}"
 
-echo "ANCODE $ANCODE"
-
-getname ${NAME_LINE}
-if [ "x${NAME}" == "x" ]
+for i in $(seq ${NAME_LINE} ${ALTERNATE_NAME_LINE})
+do
+    getname ${i}
+    if [ "x${NAME}" != "x" ]
     then
-    getname ${ALTERNATE_NAME_LINE}
-fi
+        break
+    fi
+done
 
 echo "NAME $NAME"
 rm ${outfile}
