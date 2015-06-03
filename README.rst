@@ -122,3 +122,14 @@ Writing a payroll RC file
 Use pdf2txt -q -layout once on the file. In the output txt file, find the line and
 the column where the ANCODE is written, then set the ANCODE_LINE and ANCODE_COL
 accordingly. Do the same for the NAME, with NAME_LINE, NAME_COL.
+
+Known problems
+---------------
+
+When the logs returns messages like :
+
+CRITICAL  - No data collected in outline? Strange
+CRITICAL  - No page of output!
+
+If the end user generates his files with Sage "Édition pilotée", the problem may
+be that the end user used "print to PDF" export instead of "Save to PDF".
