@@ -33,13 +33,13 @@ if [ -f ${SPECIFIC_CONFIG} ]
 fi
 
 # If the alternate line number is not specified, we use the base line number
-if [ ALTERNATE_ANCODE_LINE == -1 ]
+if [ ${ALTERNATE_ANCODE_LINE} == "-1" ]
 then
-    ALTERNATE_ANCODE_LINE=ANCODE_LINE
+    ALTERNATE_ANCODE_LINE=${ANCODE_LINE}
 fi
-if [ ALTERNATE_NAME_LINE == -1 ]
+if [ ${ALTERNATE_NAME_LINE} == "-1" ]
 then
-    ALTERNATE_NAME_LINE=NAME_LINE
+    ALTERNATE_NAME_LINE=${NAME_LINE}
 fi
 
 pdftotext -q -layout -f $PAGE -l $PAGE "${FILE}" $outfile
