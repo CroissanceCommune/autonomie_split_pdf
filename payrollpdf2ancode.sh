@@ -12,7 +12,15 @@ set -u
 
 FILE=$1
 PAGE=$2
-outfile=`tempfile`
+
+if hash tempfile 2>/dev/null
+then
+    # debian
+    outfile=`tempfile`
+else
+    # Fedora
+    outfile=`mktemp`
+fi
 
 pdftotext -q -layout -f $PAGE -l $PAGE "${FILE}" $outfile
 
