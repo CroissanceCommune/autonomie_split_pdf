@@ -162,7 +162,7 @@ class PayrollTweaker(PdfTweaker):
         if result is not None:
             for key in ('^Mlle', '^Mme', '^M'):
                 result = re.sub(key, '', result)
-        return result
+        return result.strip()
 
     def find_ancode(self, pdf_lines):
         """
@@ -173,7 +173,7 @@ class PayrollTweaker(PdfTweaker):
         result = self._find_datatype('ancode', pdf_lines)
         if result:
             result = result.split(' ')[0]
-        return result
+        return result.strip()
 
     def _getinfo(self, filename, pagenb):
         """
@@ -251,6 +251,7 @@ class PayrollTweaker(PdfTweaker):
         # this is utf-8 and python2 thinks it is ascii
         stdout = stdout.decode('utf-8')
         stdout = ' '.join(stdout.split())  # normalize spaces
+
         if returncode != 0:
             self.logger.critical(
                 'While checking correct parsing, pdftotext '
