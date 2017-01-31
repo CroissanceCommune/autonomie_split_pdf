@@ -58,14 +58,17 @@ def unix_sanitize(some_name):
 
 class PdfTweaker(object):
 
-    def __init__(self, inputfile):
+    def __init__(self, inputfile, filetype=None):
         self.logger = mk_logger('autosplit.tweaker')
         config = Config.getinstance()
         self.config = config
         self.inputfile = inputfile
         self.last_print_page = 0
+        if filetype is None:
+            filetype = self.inputfile.doctype
+
         self.output_dir = os.path.join(
-            self._DOCTYPE, self.inputfile.year, self.inputfile.month
+            filetype, self.inputfile.year, self.inputfile.month
         )
         self.pages_to_process = self.restrict = self.config.getvalue('restrict')
         self.pb_dir = self.config.getvalue('pb_dir')
@@ -89,8 +92,8 @@ class PdfTweaker(object):
             process = Popen(argv_seq, stdout=PIPE, stderr=PIPE)
         except OSError:
             self.logger.critical(
-                    "Error while trying to run '%s'",
-                    ' '.join(argv_seq))
+                "Error while trying to run '%s'",
+                ' '.join(argv_seq))
             raise
         return process
 
@@ -111,7 +114,7 @@ class PdfTweaker(object):
         skip_sections=0,
         mainsections_count=None,
         reverse_naming=False
-        ):
+    ):
         """
         :param int skip_sections: In order to handle several
             documents in the same file, I introduced skip_sections:
@@ -122,6 +125,7 @@ class PdfTweaker(object):
             for Port-Parallele - outline is reversed
             (analytic code / entr_name)
         """
+        self.logger.debug("Writing to {0}".format(self.output_dir))
         mkdir_p(self.output_dir, self.logger)
         filename = pdfstream.name
         with open(filename, 'rb') as duplicate_pdfstream:
@@ -149,16 +153,22 @@ class PdfTweaker(object):
                     pages_nb,
                     skip_sections,
                     mainsections_count,
-                            ):
-                self.logger.critical("No data could be extracted! "
-                "Not splitting, sorry")
+            ):
+                self.logger.critical(
+                    "No data could be extracted! "
+                    "Not splitting, sorry"
+                )
                 return
 
             self.logger.debug("Now writing files")
 
             did_print = False
             for iteration, printinfo in enumerate(self.split_stream(pages_nb)):
-                self.printpages(iteration, *printinfo, reverse_naming=reverse_naming)
+                self.printpages(
+                    iteration,
+                    *printinfo,
+                    reverse_naming=reverse_naming
+                )
                 did_print = True
 
             if not did_print:
@@ -206,8 +216,7 @@ class PdfTweaker(object):
                     )
                 return
 
-    def printpages(self, iteration, pagenb,
-        *args, **kwargs):
+    def printpages(self, iteration, pagenb, *args, **kwargs):
         """
         *args are passed to implementation specific addpage(), prepended by
         the PdfFileWriter and pagenb
@@ -266,15 +275,22 @@ class PdfTweaker(object):
 
 
 class OutlineTweaker(PdfTweaker):
+    _TYPE = 'outline'
+    _UNITARY_TIME = 0.1
 
     def split_stream(self, pages_nb):
         if not self.outlinedata:
             self.logger.critical("No data collected in outline? Strange")
         return iter(self.outlinedata)
 
-    def getdata(self, reader, filename, pages_nb,
+    def getdata(
+        self,
+        reader,
+        filename,
+        pages_nb,
         skip_sections=0,
-        mainsections_count=None):
+        mainsections_count=None
+    ):
         """
         :param int skip_sections: see :func:`tweak`
         :param int mainsections_count: see :func:`tweak`
@@ -310,15 +326,20 @@ class OutlineTweaker(PdfTweaker):
                     return True
 
             else:
-                for entre_nb, entrepreneur in enumerate(first_level_section.get_contents()):
+                for entre_nb, entrepreneur in enumerate(
+                    first_level_section.get_contents()
+                ):
                     self.logger.debug("Entering a 2nd level section")
                     for item in entrepreneur:
                         self._browse_ancode_level(item, reader, logger)
                     logger.debug("End of a 2nd level section")
             logger.debug("End of a 1st level section")
 
-        logger.info("Found %i entrepreneurs and %i analytic codes",
-            entre_nb + 1, len(self.alldata))
+        logger.info(
+            "Found %i entrepreneurs and %i analytic codes",
+            entre_nb + 1,
+            len(self.alldata)
+        )
         logger.info("ETA: %s s", len(self.alldata) * 0.4)
         return True
 
@@ -330,12 +351,14 @@ class OutlineTweaker(PdfTweaker):
             "section contents: startpage:%3i - length: %i - %-7s '%s'" \
             % outline_item
 
-        logger.debug("startpage:%3i - length: %i - %-7s '%s'",
-            *outline_item)
+        logger.debug(
+            "startpage:%3i - length: %i - %-7s '%s'", *outline_item
+        )
         self.outlinedata.append(outline_item + (reader,))
         self.alldata.append((outline_item[3], outline_item[2]))
         unique_key = u'{0}_{1}'.format(
-            unidecode.unidecode(outline_item[3]), unidecode.unidecode(outline_item[2])
+            unidecode.unidecode(outline_item[3]),
+            unidecode.unidecode(outline_item[2])
         )
         self.logger.debug("unique_key: %s", unique_key)
         if unique_key in self.registered_infos:
@@ -359,9 +382,9 @@ class OutlineTweaker(PdfTweaker):
             assert False, \
                 "Current 'last_print_page' is {0} " \
                 "and section_pagenos: {1}".format(
-                self.last_print_page,
-                self.section_pages
-            )
+                    self.last_print_page,
+                    self.section_pages
+                )
 
         return start, startpageno
 
@@ -369,7 +392,7 @@ class OutlineTweaker(PdfTweaker):
         print_all_remaining = False
         section_start, section_end = self.get_section_boundaries()
         if self.restrict > section_end + 1:
-            self.restrict = section_end + 1 # suboptimal: should be set ONCE
+            self.restrict = section_end + 1  # suboptimal: should be set ONCE
             # +1 is conservative
         if next_index < len(self.alldata):
             next_entr, next_ancode = self.alldata[next_index]
@@ -411,7 +434,15 @@ class OutlineTweaker(PdfTweaker):
                 return None
         return None
 
-    def addpages(self, output, startpage, pages_nb, ancode, entrepreneur, reader):
+    def addpages(
+        self,
+        output,
+        startpage,
+        pages_nb,
+        ancode,
+        entrepreneur,
+        reader
+    ):
         for pageno in xrange(pages_nb):
             self.last_print_page = startpage + pageno
             assert startpage >= 0, "Start page = %s" % startpage
@@ -421,14 +452,19 @@ class OutlineTweaker(PdfTweaker):
         self.logger.debug("addpages: %-7s %s", ancode, entrepreneur)
         return pages_nb
 
-
     def register_pages(self, reader, pages_nb):
         """
         original implementation inefficient here
         """
         pass
 
-    def browse(self, outline, level=0, previous_section=None, no_entr_name=False):
+    def browse(
+        self,
+        outline,
+        level=0,
+        previous_section=None,
+        no_entr_name=False
+    ):
         """
         Offset will be calculated once, on the first outline
 
@@ -453,13 +489,16 @@ class OutlineTweaker(PdfTweaker):
                     # happens only once in the parsing
                     # set offset
                     self.offset = destination.page.idnum
-                    self.logger.debug("Page numbers are offset by %i", self.offset)
+                    self.logger.debug(
+                        "Page numbers are offset by %i",
+                        self.offset
+                    )
                 section = _destination2section(
                     destination,
                     level,
                     previous_section,
                     self.offset
-                    )
+                )
                 previous_section = section
                 start_ends.append(section)
                 self.logger.debug("Done reading section: %s", section)
@@ -472,7 +511,10 @@ class OutlineTweaker(PdfTweaker):
                     previous_section.add_subsections([container_section])
                 else:
                     container_section = previous_section
-                self.logger.debug("Reading section container (parent=%s)", previous_section)
+                self.logger.debug(
+                    "Reading section container (parent=%s)",
+                    previous_section
+                )
                 lower_level_sections = self.browse(
                     destination, level + 1,
                     previous_section=container_section,
@@ -486,6 +528,7 @@ class OutlineTweaker(PdfTweaker):
                     )
         return start_ends
 
+
 def _destination2section(destination, level, previous_section, offset):
     """
     :param Destination destination:
@@ -495,8 +538,10 @@ def _destination2section(destination, level, previous_section, offset):
     section = Section(destination, level, previous_section, offset)
     pageno = section.startpage
 
-    assert pageno >= 0, "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
-        pageno, destination.page.idnum, offset)
+    assert pageno >= 0, \
+        "computed pageno: {:d}, - with idnum {:d} and offset: {:d}".format(
+            pageno, destination.page.idnum, offset
+        )
 
     if previous_section is not None:
         previous_section.compute_page_info(pageno)
