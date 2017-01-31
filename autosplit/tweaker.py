@@ -157,7 +157,7 @@ class PayrollTweaker(PdfTweaker):
         """
         result = self._find_datatype('name', pdf_lines)
         if result is not None:
-            for key in ('^M', '^Mlle', '^Mme'):
+            for key in ('^Mlle', '^Mme', '^M'):
                 result = re.sub(key, '', result)
         return result
 
