@@ -1,0 +1,14 @@
+*.ini
+*.pyc
+.*.swp
+*.egg-info
+*.eggs
+mako_compiled_templates
+*.log
+data
+*.egg
+dist
+build
+.ropeproject
+tobeignored
+node_modules
