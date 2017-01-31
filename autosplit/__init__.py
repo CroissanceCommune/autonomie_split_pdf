@@ -75,28 +75,33 @@ def main():
         type=argparse.FileType('r'),
         help='pdf filename named DOCTYPE_YEAR_MONTH.pdf',
         nargs='+'
-        )
+    )
     parser.add_argument(
         '-c', '--configfile',
         help='configuration file, defaults to %s' % DEFAULT_CONFIGFILE,
         default=None,
         type=argparse.FileType('r')
-        )
-    parser.add_argument('-v', '--verbose', action='store_const', const=True,
-                        help='verbose output', default=False)
-    parser.add_argument('-r', '--restrict', help="Restrict to n first pages",
-                        type=int, default=0)
-    parser.add_argument('-n', '--no-entr-name',
-        help="Doc structure has no names: "
-        "it only has analytic codes",
-        action='store_true',
+    )
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='store_const',
+        const=True,
+        help='verbose output',
         default=False
+    )
+    parser.add_argument(
+        '-r',
+        '--restrict',
+        help="Restrict to n first pages",
+        type=int,
+        default=0
     )
     parser.add_argument(
         '-V', '--version',
         action='version',
         version="%%(prog)s (pdf split for autonomie version %s)" % __version__
-        )
+    )
 
     arguments = parser.parse_args()
 
@@ -111,6 +116,7 @@ def main():
     logger.info(version())
     logger.debug("Command line: %s", sys.argv)
     logger.debug("Parsed arguments: %s", arguments)
+    logger.debug("Current config : %s", config.confvalues)
     logger.debug("Current working directory: %s", os.getcwd())
 
     logger.info("Verbosity set to %s", config.getvalue("verbosity"))
@@ -131,17 +137,36 @@ def main():
         logger.info('Loading PDF "%s"', inputfile.filepath)
         logger.info('md5 hash: %s', get_md5sum(open(inputfile.filepath, 'rb')))
 
-        if inputfile.doctype not in DOC_TWEAKERS:
+        parser_name = config.get_parser_name(inputfile)
+        if parser_name is None:
             error_msg = (
-                "The filename isn't recognized by autosplit splitters: "
-                "{}".format(DOC_TWEAKERS.keys())
+                u"The given type '{}' isn't recognized by autosplit".format(
+                    inputfile.doctype
+                )
+            )
+            logger.error(error_msg)
+            log_exception(logger)
+            raise AutosplitError(error_msg)
+
+        logger.info(
+            "A parser of type {0} will be used to parse the file".format(
+                parser_name
+            )
+        )
+
+        tweaker = DOC_TWEAKERS[parser_name]
+
+        if parser_name not in DOC_TWEAKERS:
+            error_msg = (
+                "The given name '{}' isn't recognized by autosplit splitters: "
+                "{}".format(parser_name, DOC_TWEAKERS.keys())
             )
             logger.error(error_msg)
             log_exception(logger)
             raise AutosplitError(error_msg)
 
         try:
-            tweaker = DOC_TWEAKERS[inputfile.doctype](inputfile)
+            tweaker = DOC_TWEAKERS[parser_name](inputfile)
         except ConfigError, exception:
             logger.critical(
                 "Error in your configuration: %s", exception.message
