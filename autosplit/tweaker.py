@@ -50,7 +50,7 @@ class PayrollTweaker(PdfTweaker):
     def __init__(self, *args):
         PdfTweaker.__init__(self, *args)
         self._notfoundpages = 0
-        self.preprocessor = self.config.getvalue(('payroll', 'preprocessor'))
+        self.preprocessor = self.config.getvalue(('preprocessor', 'payroll'))
         if not os.path.exists(self.preprocessor):
             raise config.Error(
                 "payroll preprocessor: %s - file not found"
