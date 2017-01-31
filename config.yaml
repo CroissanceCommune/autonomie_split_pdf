@@ -5,10 +5,23 @@
     log_to_mail: false,
     payroll: {
         preprocessor: ./payrollpdf2ancode.sh,
+        salaire: {
+            ancode_line: 1,
+            ancode_column: 30,
+            ancode_end_column: 50,
+            name_line: 1,
+            name_column: 51,
+        }
     },
     mail: {
         host: smtp.example.fr,
         from: autonomie@majerti.fr,
         to: autonomie@majerti.fr, # supports a list of addresses!
         subject: '[%(hostname)s] Log of autonomie pdf splitter',
-        }}
+    },
+    no_entr_names: false,
+    doctypes: {
+        salaire: 'payroll',
+        tresorerie: 'outline'
+    }
+}
