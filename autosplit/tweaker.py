@@ -41,7 +41,7 @@ class ParseError(AutosplitError):
 
 
 class PayrollTweaker(PdfTweaker):
-    _DOCTYPE = 'salaire'
+    _TYPE = 'payroll'
     _UNITARY_TIME = 0.1
 
     _ANCODE_MARKER = re.compile('^ANCODE ')
@@ -74,9 +74,12 @@ class PayrollTweaker(PdfTweaker):
             try:
                 ancode, name = self._getinfo(filename, pagenb)
             except UnicodeDecodeError:
-                self.logger.critical("Cannot extract text. Please check the pdf"
-                "file. For instance 'file -i %s' should not return"
-                "'charset=binary'", filename)
+                self.logger.critical(
+                    "Cannot extract text. Please check the pdf"
+                    "file. For instance 'file -i %s' should not return"
+                    "'charset=binary'",
+                    filename
+                )
                 self.logger.critical("output of 'file -i %s':", filename)
                 command = ['/usr/bin/file', '-i', filename]
                 stdout, stderr, returncode = self.get_command_outputs(command)
@@ -91,30 +94,97 @@ class PayrollTweaker(PdfTweaker):
                 return True
         return True
 
+    def _get_data(self, lines, line_number, start, end):
+        """
+        Find datas in lines regarding the given indexes
+
+        :param list lines: the extracted lines
+        :param int line_number: The line we should watch in
+        :param int start: The column it sould start in
+        :param int end: The max column we should find datas in
+        """
+        result = None
+        if line_number < len(lines):
+            line = lines[line_number]
+            if len(line) > start:
+                if end != -1 and len(line) > end:
+                    result = line[start:end]
+                else:
+                    result = line[start:]
+                result = result.strip()
+        return result
+
+    def _find_datatype(self, datatype, pdf_lines):
+        """
+        Find the An code in the pdf2str result regarding the provided
+        configuration
+
+        :param str datatype: ancode / name used to retrieve the config keys we
+        need
+        ;param list pdf_lines: the list of lines coming from the pdf
+        """
+        doctype = self.inputfile.doctype
+        # NOTE : Configuration is set with line numbers starting with 1, we move
+        # them to 0
+        line_num = self.config.getvalue(
+            ('payroll', doctype, '%s_line' % datatype)
+        ) - 1
+        alt_line_num = self.config.getvalue(
+            ('payroll', doctype, '%s_alternate_line' % datatype),
+            default=0
+        ) - 1
+        start_column = self.config.getvalue(
+            ('payroll', doctype, '%s_column' % datatype)
+        )
+        end_column = self.config.getvalue(
+            ('payroll', doctype, '%s_end_column' % datatype),
+            default=-1
+        )
+        result = self._get_data(
+            pdf_lines, line_num, start_column, end_column
+        )
+        if not result and alt_line_num != -1:
+            result = self._get_data(
+                pdf_lines, alt_line_num, start_column, end_column
+            )
+        return result
+
+    def find_name(self, pdf_lines):
+        """
+        Find the name in the pdf2str result
+
+        :param list pdf_lines: list of lines as str coming from the pdf
+        """
+        result = self._find_datatype('name', pdf_lines)
+        if result is not None:
+            for key in ('^M', '^Mlle', '^Mme'):
+                result = re.sub(key, '', result)
+        return result
+
+    def find_ancode(self, pdf_lines):
+        """
+        find the ancode in the pdf2str result
+
+        :param list pdf_lines: list of lines as str coming from the pdf
+        """
+        result = self._find_datatype('ancode', pdf_lines)
+        if result:
+            result = result.split(' ')[0]
+        return result
+
     def _getinfo(self, filename, pagenb):
+        """
+        Return the datas found in the page pagenb of the given file
 
-        # Warning: 1 - indexed page number for pdftotext, while the current
-        # software and PyPDF2 API use 0 - index.
-        pdftotext_pagenb = pagenb + 1
+        :param str filename: The full path to the file
+        :param int pagenb: The page number (starting with 0)
+        """
+        pdf_str = self._get_pdf_str(filename, pagenb)
 
-        command = [
-            self.preprocessor,
-            filename, '%d' % pdftotext_pagenb,
-            ]
-        stdout, stderr, returncode = self.get_command_outputs(command)
-        strcommand = " ".join(command)
-        if returncode != 0:
-            raise ParseError("Return code of command '%s': %d", (strcommand, returncode))
-        stdout = stdout.decode('utf-8')
-        if "Error (" in stdout:
-            fdesc, temppath = mkstemp(prefix="txt_split_error-")
-            with open(temppath, 'w') as tempfd:
-                tempfd.write(stdout)
-            raise ParseError("pdf splitting failed - txt file dumped as %s - command was '%s' "
-                % (temppath, strcommand))
-        stdout_lines = stdout.split('\n')
-        ancode = self.parse_single_value(stdout_lines[0], self._ANCODE_MARKER)
-        name = self.parse_single_value(stdout_lines[1], self._NAME_MARKER)
+        pdf_lines = pdf_str.split('\n')
+
+        ancode = self.find_ancode(pdf_lines)
+        name = self.find_name(pdf_lines)
 
         if not (name and ancode):
             flag_report(False)
@@ -123,15 +193,12 @@ class PayrollTweaker(PdfTweaker):
             else:
                 field = "Ancode"
 
-            import os
-            home = os.environ['HOME']
-            command_str = " ".join(command)
-
             raise AutosplitError(
                 (
-                    "{} field wasn't correctly extracted. Try the "
-                    "following:\nHOME={} {}"
-                ).format(field, home, command_str)
+                    "{} field wasn't correctly extracted."
+                    "Compare the lines and columns in the <HOME>/config.yaml"
+                    " file the output from the last command (see previous log)"
+                ).format(field, filename, pagenb)
             )
 
         unique_key = u'{0}_{1}'.format(ancode, name)
@@ -142,10 +209,44 @@ class PayrollTweaker(PdfTweaker):
         self.logger.info("Page %d: %s %s", pagenb, ancode, name)
         return ancode, name
 
-    def check_splitpage(self, file_to_check, name, ancode):
-        command = ["pdftotext", "-q", "-layout", file_to_check, '-'] # - is for stdout
+    def _get_pdf_str(self, filename, pagenb):
+        """
+        Return the pagenb of filename as a simple unicode string
+        :param str filename: The path to the pdf
+        :param int pagenb: The number of the page
+        """
+        # Warning: 1 - indexed page number for pdftotext, while the current
+        # software and PyPDF2 API use 0 - index.
+        pdftotext_pagenb = pagenb + 1
+
+        command = [
+            self.preprocessor,
+            filename, '%d' % pdftotext_pagenb,
+        ]
         stdout, stderr, returncode = self.get_command_outputs(command)
-        stdout = stdout.decode('utf-8')  # this is utf-8 and python2 thinks it is ascii
+        strcommand = " ".join(command)
+        if returncode != 0:
+            raise ParseError(
+                "Return code of command '%s': %d", (strcommand, returncode)
+            )
+
+        stdout = stdout.decode('utf-8')
+        if "Error (" in stdout:
+            fdesc, temppath = mkstemp(prefix="txt_split_error-")
+            with open(temppath, 'w') as tempfd:
+                tempfd.write(stdout)
+            raise ParseError(
+                "pdf splitting failed - txt file dumped as %s - "
+                "command was '%s' " % (temppath, strcommand)
+            )
+        return stdout
+
+    def check_splitpage(self, file_to_check, name, ancode):
+        # - is for stdout
+        command = ["pdftotext", "-q", "-layout", file_to_check, '-']
+        stdout, stderr, returncode = self.get_command_outputs(command)
+        # this is utf-8 and python2 thinks it is ascii
+        stdout = stdout.decode('utf-8')
         stdout = ' '.join(stdout.split())  # normalize spaces
         if returncode != 0:
             self.logger.critical(
@@ -182,50 +283,38 @@ class PayrollTweaker(PdfTweaker):
         return marker_re.sub('', value)
 
 
-class SituationTweaker(OutlineTweaker):
-    _DOCTYPE = 'tresorerie'
-    _UNITARY_TIME = 0.1
-
-
-class ResultTweaker(OutlineTweaker):
-    _DOCTYPE = 'resultat'
-    _UNITARY_TIME = 0.1
-
-
 class ResultAndSituationTweaker(OutlineTweaker):
     """
     Implements interface of OutlineTweaker
     Lazy implementation: inheritance.
     We'd rather separate interface and implementation
     """
-    _DOCTYPE = 'resultat-tresorerie'
+    _TYPE = 'resultat-tresorerie'
     _UNITARY_TIME = 0.1
 
     def __init__(self, inputfile):
-        self.result = ResultTweaker(inputfile)
-        self.situation = SituationTweaker(inputfile)
+        self.result = OutlineTweaker(inputfile, filetype='resultat')
+        self.situation = OutlineTweaker(inputfile, filetype='tresorerie')
 
     def tweak(self, pdfstream):
-
         self.result.tweak(
             pdfstream,
             mainsections_count=1,
             reverse_naming=True
-            )
+        )
         self.situation.tweak(
             pdfstream,
             skip_sections=1,
             mainsections_count=1,
             reverse_naming=True
-            )
+        )
 
 
 DOC_TWEAKERS = dict(
-    (klass._DOCTYPE, klass)
+    (klass._TYPE, klass)
     for klass in (
-        SituationTweaker,
-        ResultTweaker,
         ResultAndSituationTweaker,
-        PayrollTweaker
+        PayrollTweaker,
+        OutlineTweaker,
         )
     )
