@@ -152,12 +152,21 @@ class Config(object):
             if value is _UNSET:
                 value = self.DEFAULTS[name]
             return value
+
         intermediate = self.confvalues
         for item in name:
             intermediate = intermediate.get(item)
-            if intermediate is None and default is not None:
-                intermediate = default
-                break
+            if intermediate is None:
+                if default is not None:
+                    intermediate = default
+                    break
+                else:
+                    raise AutosplitError(
+                        "Missing mandatory configuration parameter {0}".format(
+                            name
+                        )
+                    )
+
         return intermediate
 
     def get_parser_name(self, inputfile):
