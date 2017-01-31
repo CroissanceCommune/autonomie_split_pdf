@@ -1,29 +1,27 @@
-{
-    loglevel: 10,
-    use_syslog: true,
-    verbosity: DEBUG,
-    log_to_mail: false,
-    preprocessor: {
-        payroll: ./payrollpdf2ancode.sh,
-    },
-    payroll: {
-        salaire: {
-            ancode_line: 1,
-            ancode_column: 30,
-            ancode_end_column: 50,
-            name_line: 1,
-            name_column: 51,
-        }
-    },
-    mail: {
-        host: smtp.example.fr,
-        from: autonomie@majerti.fr,
-        to: autonomie@majerti.fr, # supports a list of addresses!
-        subject: '[%(hostname)s] Log of autonomie pdf splitter',
-    },
-    no_entr_names: false,
-    doctypes: {
-        salaire: 'payroll',
-        tresorerie: 'outline'
-    }
-}
+loglevel: 10,
+use_syslog: true,
+verbosity: DEBUG,
+log_to_mail: false,
+preprocessor:
+    payroll: ./payrollpdf2ancode.sh,
+
+payroll:
+    salaire:
+        ancode_line: 1
+        ancode_column: 30
+        ancode_end_column: 50
+        name_line: 1
+        name_column: 51
+mail:
+    host: smtp.example.fr
+    from: autonomie@majerti.fr
+    to: autonomie@majerti.fr
+    subject: '[%(hostname)s] Log of autonomie pdf splitter'
+
+outline:
+    no_entr_name: false
+doctypes:
+    salaire: 'payroll'
+    tresorerie: 'outline'
+
+

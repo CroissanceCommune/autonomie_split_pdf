@@ -298,7 +298,7 @@ class OutlineTweaker(PdfTweaker):
 
         outlines = reader.getOutlines()
         logger = mk_logger('autosplit.getdata')
-        no_entr_name = self.config.getvalue('no_entr_name')
+        no_entr_name = self.config.getvalue(('outline', 'no_entr_name'))
         if no_entr_name:
             logger.critical(
                 "Single level outline (no_entr_name) : cannot infer"
