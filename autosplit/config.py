@@ -63,7 +63,13 @@ class Config(object):
             'preprocessor': './payrollpdf2ancode.sh',
         },
         'mail': {'subject': '[%(hostname)s] Log of autonomie pdf splitter', },
-        'pb_dir': os.path.join(os.environ['HOME'], 'problems')
+        'pb_dir': os.path.join(os.environ['HOME'], 'problems'),
+        'doctypes': {
+            'salaire': 'payroll',
+            'resultat': 'outline',
+            'tresorerie': 'outline',
+            'resultat-tresorerie': 'resultat-tresorerie',
+        }
     }
 
     _INSTANCE = None
@@ -86,14 +92,15 @@ class Config(object):
 
         if configstream:
             self.confvalues.update(yaml.load(configstream))
+
         self._setverb()
 
         self.confvalues['restrict'] = self.parsed_args.restrict
         self.inputfiles = list(self._parse_inputfiles(parsed_args))
-        self.confvalues['no_entr_name'] = self.parsed_args.no_entr_name
 
     def _parse_inputfiles(self, parsed_args):
-        inputfile = namedtuple('inputfile',
+        inputfile = namedtuple(
+            'inputfile',
             ['doctype', 'year', 'month', 'filepath', 'filedescriptor']
         )
 
@@ -122,11 +129,13 @@ class Config(object):
 
         str_verb = self.confvalues.get('verbosity')
 
-        self.confvalues['loglevel'] = {'DEBUG': logging.DEBUG,
-         'INFO': logging.INFO,
-         'WARNING': logging.WARNING,
-         'ERROR': logging.ERROR,
-         'CRITICAL': logging.CRITICAL}[str_verb]
+        self.confvalues['loglevel'] = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL
+        }[str_verb]
 
     def save_defaults(self):
         """
@@ -135,7 +144,7 @@ class Config(object):
         with open("config.yaml", "w") as confstream:
             confstream.write(yaml.dump(self.confvalues))
 
-    def getvalue(self, name, override=_UNSET):
+    def getvalue(self, name, override=_UNSET, default=None):
         if override is not _UNSET:
             return override
         if isinstance(name, basestring):
@@ -145,5 +154,11 @@ class Config(object):
             return value
         intermediate = self.confvalues
         for item in name:
-            intermediate = intermediate[item]
+            intermediate = intermediate.get(item)
+            if intermediate is None and default is not None:
+                intermediate = default
+                break
         return intermediate
+
+    def get_parser_name(self, inputfile):
+        return self.confvalues['doctypes'].get(inputfile.doctype)
