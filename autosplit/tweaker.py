@@ -135,11 +135,14 @@ class PayrollTweaker(PdfTweaker):
         ) - 1
         start_column = self.config.getvalue(
             ('payroll', doctype, '%s_column' % datatype)
-        )
+        ) - 1
+        if start_column == -1:
+            start_column = 0
+
         end_column = self.config.getvalue(
             ('payroll', doctype, '%s_end_column' % datatype),
-            default=-1
-        )
+            default=0
+        ) - 1
         result = self._get_data(
             pdf_lines, line_num, start_column, end_column
         )
