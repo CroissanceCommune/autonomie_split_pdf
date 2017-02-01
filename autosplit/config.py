@@ -57,10 +57,12 @@ class Config(object):
         'loglevel': 20,
         'use_syslog': False,
         'log_to_mail': False,
-        'no_entr_name': False,
+        'outline': {
+            'no_entr_name': False
+        },
         'restrict': 0,
-        'payroll': {
-            'preprocessor': './payrollpdf2ancode.sh',
+        'preprocessor': {
+            'payroll': './payrollpdf2ancode.sh',
         },
         'mail': {'subject': '[%(hostname)s] Log of autonomie pdf splitter', },
         'pb_dir': os.path.join(os.environ['HOME'], 'problems'),
