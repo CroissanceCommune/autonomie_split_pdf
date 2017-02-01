@@ -103,7 +103,7 @@ class PayrollTweaker(PdfTweaker):
         :param int start: The column it sould start in
         :param int end: The max column we should find datas in
         """
-        result = None
+        result = ''
         if line_number < len(lines):
             line = lines[line_number]
             if len(line) > start:
@@ -159,8 +159,8 @@ class PayrollTweaker(PdfTweaker):
         :param list pdf_lines: list of lines as str coming from the pdf
         """
         result = self._find_datatype('name', pdf_lines)
-        if result is not None:
-            for key in ('^Mlle', '^Mme', '^M'):
+        if result:
+            for key in ('^Mlle ', '^Mme ', '^M '):
                 result = re.sub(key, '', result)
         return result.strip()
 
