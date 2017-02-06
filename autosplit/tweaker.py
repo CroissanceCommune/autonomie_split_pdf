@@ -56,12 +56,40 @@ class PayrollTweaker(PdfTweaker):
                 "payroll preprocessor: %s - file not found"
                 % self.preprocessor)
 
-    def addpages(self, output, pagenb):
-        self.logger.debug("addpages for %i", pagenb)
-        page = self.allpages[pagenb]
-        output.addPage(page)
-        self.last_print_page += 1
-        return 1
+        self.prec_ancode = None
+        self.page_nbs = []
+
+    def getprintdata(self, next_index):
+        """
+        Return arguments passed to addpages
+        Check if there is a multiple paged salarysheet and returns the indexes
+
+        :param next_index: The
+        """
+        if next_index <= len(self.page_nbs):
+            return (len(self.page_nbs[next_index - 1]),)
+        else:
+            raise Exception("Falsy index asked, we don't have so much pages")
+            return ()
+
+    def addpages(self, output, startpage, pages_nb):
+        """
+        Add the pages to the output file
+        Called in the parent class tweak process
+
+        :param obj output: A write buffer
+        :param int startpage: The page to write from
+        :param int pages_nb: The number of pages to write
+
+        :returns: The number of pages we wrote
+        """
+        startpage = self.last_print_page
+        self.logger.debug("addpages starting at %i", startpage)
+        for pageno in xrange(pages_nb):
+            self.last_print_page = startpage + pageno + 1
+            page = self.allpages[self.last_print_page - 1]
+            output.addPage(page)
+        return pages_nb
 
     def getdata(self, reader, filename, pages_nb, *args):
         """
@@ -73,6 +101,11 @@ class PayrollTweaker(PdfTweaker):
             # Perhaps here, add a try/except ParseError and ignore buggy page
             try:
                 ancode, name = self._getinfo(filename, pagenb)
+            except Incoherence as e:
+                self.logger.critical(
+                    "Incoherence error : %s" % e.message
+                )
+                return False
             except UnicodeDecodeError:
                 self.logger.critical(
                     "Cannot extract text. Please check the pdf"
@@ -85,7 +118,9 @@ class PayrollTweaker(PdfTweaker):
                 stdout, stderr, returncode = self.get_command_outputs(command)
                 self.logger.critical(stdout.strip())
                 return False
-            self.alldata.append((name, ancode))
+            if (name, ancode)not in self.alldata:
+                self.alldata.append((name, ancode))
+
             if self.restrict and pagenb + 1 >= self.restrict:
                 self.logger.info(
                     "Stopping the parsing as requested by limit of %d pages",
@@ -205,8 +240,20 @@ class PayrollTweaker(PdfTweaker):
             )
 
         unique_key = u'{0}_{1}'.format(ancode, name)
-        if unique_key in self.registered_infos:
-            raise Incoherence(u'{0} already registered'.format(unique_key))
+
+        if unique_key == self.prec_ancode:
+            # multiple successive page
+            self.page_nbs[-1].append(pagenb)
+
+        elif unique_key in self.registered_infos:
+            # multiple but not successive pages -> Error
+            raise Incoherence(
+                u'{0} already registered and not joined'.format(unique_key)
+            )
+        else:
+            self.page_nbs.append([pagenb])
+            self.prec_ancode = unique_key
+
         self.registered_infos.add(unique_key)
 
         self.logger.info("Page %d: %s %s", pagenb, ancode, name)
