@@ -129,7 +129,7 @@ class PayrollTweaker(PdfTweaker):
                 return True
         return True
 
-    def _get_data(self, lines, line_number, start, end):
+    def _get_data(self, lines, line_number, start, end, prefix):
         """
         Find datas in lines regarding the given indexes
 
@@ -137,10 +137,19 @@ class PayrollTweaker(PdfTweaker):
         :param int line_number: The line we should watch in
         :param int start: The column it sould start in
         :param int end: The max column we should find datas in
+        :param str prefix: prefix before the datas we look for (start and end
+        are prefix-related coordinates)
         """
         result = ''
         if line_number < len(lines):
             line = lines[line_number]
+            if prefix:
+                splitted = line.split(prefix)
+                if len(splitted) <= 1:
+                    return result
+                else:
+                    line = splitted[1]
+
             if len(line) > start:
                 if end != -1 and len(line) > end:
                     result = line[start:end]
@@ -178,8 +187,13 @@ class PayrollTweaker(PdfTweaker):
             ('payroll', doctype, '%s_end_column' % datatype),
             default=0
         ) - 1
+        prefix = self.config.getvalue(
+            ('payroll', doctype, '%s_prefix' % datatype),
+            default=''
+        ).strip()
+
         result = self._get_data(
-            pdf_lines, line_num, start_column, end_column
+            pdf_lines, line_num, start_column, end_column, prefix,
         )
         if not result and alt_line_num != -1:
             result = self._get_data(
