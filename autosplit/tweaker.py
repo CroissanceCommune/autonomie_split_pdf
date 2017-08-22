@@ -197,7 +197,7 @@ class PayrollTweaker(PdfTweaker):
         )
         if not result and alt_line_num != -1:
             result = self._get_data(
-                pdf_lines, alt_line_num, start_column, end_column
+                pdf_lines, alt_line_num, start_column, end_column, prefix,
             )
         return result
 
