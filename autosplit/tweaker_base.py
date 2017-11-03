@@ -130,6 +130,8 @@ class PdfTweaker(object):
         filename = pdfstream.name
         with open(filename, 'rb') as duplicate_pdfstream:
             inputpdf = PdfFileReader(duplicate_pdfstream)
+            if inputpdf.isEncrypted:
+                inputpdf.decrypt('')
 
             pages_nb = inputpdf.getNumPages()
             if not self.pages_to_process:
