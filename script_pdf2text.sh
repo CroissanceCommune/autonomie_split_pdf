@@ -1,11 +1,5 @@
 #!/bin/bash
-
-# How to find the parameters:
-#
-# pdftotext -q -layout -f 1 -l 1 file.pdf outfile.txt
-# view outfile.txt
-# Find the column/line for name (including M, Mme or Mlle) and analytic code
-# Take some margin on the left
+# Output provided page numbers of the given pdf to stdout
 
 set -e
 set -u
