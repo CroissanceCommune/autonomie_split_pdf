@@ -129,6 +129,40 @@ class PayrollTweaker(PdfTweaker):
                 return True
         return True
 
+    @staticmethod
+    def _get_line_part_after_prefix(line, prefix):
+        """
+        Return datas in line remaining after prefix
+
+        :param str line: The line to split
+        :param str prefix: The prefix to check
+        :returns: The remaining line part after prefix
+        """
+        result = ""
+        splitted = line.split(prefix)
+        if len(splitted) >= 1:
+            result = splitted[1]
+        return result
+
+    @staticmethod
+    def _get_line_part_from_range(line, start, end):
+        """
+        Return datas in line found between start and end index
+
+        :param str line: The line to manage
+        :param int start: The start index
+        :param int end: The end index
+        :returns: The matched part of the line
+        """
+        result = ""
+        if len(line) > start:
+            if end != -1 and len(line) > end:
+                result = line[start:end]
+            else:
+                result = line[start:]
+            result = result.strip()
+        return result
+
     def _get_data(self, lines, line_number, start, end, prefix):
         """
         Find datas in lines regarding the given indexes
@@ -144,18 +178,16 @@ class PayrollTweaker(PdfTweaker):
         if line_number < len(lines):
             line = lines[line_number]
             if prefix:
-                splitted = line.split(prefix)
-                if len(splitted) <= 1:
-                    return result
-                else:
-                    line = splitted[1]
+                line = self._get_line_part_after_prefix(prefix)
 
-            if len(line) > start:
-                if end != -1 and len(line) > end:
-                    result = line[start:end]
-                else:
-                    result = line[start:]
-                result = result.strip()
+            result = self._get_line_part_from_range(line, start, end)
+
+        if not result and prefix:
+            for line in lines:
+                if prefix in line:
+                    line = self._get_line_part_after_prefix(prefix)
+                    result = self._get_line_part_from_range(line, start, end)
+
         return result
 
     def _find_datatype(self, datatype, pdf_lines):
