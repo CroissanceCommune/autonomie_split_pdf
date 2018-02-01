@@ -140,7 +140,7 @@ class PayrollTweaker(PdfTweaker):
         """
         result = ""
         splitted = line.split(prefix)
-        if len(splitted) >= 1:
+        if len(splitted) > 1:
             result = splitted[1]
         return result
 
