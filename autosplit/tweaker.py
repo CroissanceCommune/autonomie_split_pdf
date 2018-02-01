@@ -178,14 +178,14 @@ class PayrollTweaker(PdfTweaker):
         if line_number < len(lines):
             line = lines[line_number]
             if prefix:
-                line = self._get_line_part_after_prefix(prefix)
+                line = self._get_line_part_after_prefix(line, prefix)
 
             result = self._get_line_part_from_range(line, start, end)
 
         if not result and prefix:
             for line in lines:
                 if prefix in line:
-                    line = self._get_line_part_after_prefix(prefix)
+                    line = self._get_line_part_after_prefix(line, prefix)
                     result = self._get_line_part_from_range(line, start, end)
 
         return result
